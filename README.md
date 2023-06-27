@@ -13,3 +13,7 @@ usage: `PAYMENT_RATE=10.00 OPSGENIE_API_KEY=yourkeyhere OPSGENIE_SCHEDULE_ID=you
 
 You can also set OPSGENIE_DATE to a date in the month you want to calculate for, otherwise it will use the current date.
 These can all be set in a `.env` file in the same directory as the script as well
+
+### oncall.rb
+
+A script to output who is on call for the next 4 weeks.
