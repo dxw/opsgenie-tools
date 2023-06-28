@@ -17,3 +17,10 @@ These can all be set in a `.env` file in the same directory as the script as wel
 ### oncall.rb
 
 A script to output who is on call for the next 4 weeks.
+
+### calcualte-toil.rb
+
+A script to calculate the TOIL owed to people due to OOH alerts they have
+acknowledged. This gives a rough estimate of the TOIL owed so that the Line
+manager can be told how much the person should have claimed for their week.
+This currently underestimates for the first line person if the alert was escalated.
