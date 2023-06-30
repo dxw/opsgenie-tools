@@ -36,3 +36,7 @@ oncall-hours.rb. It will output the date the user is next on call.
 A script to output the schedules that are available in OpsGenie. This is useful
 for finding the ID of a schedule to use in the other scripts. It can also output
 the rotations and their ID for a given schedule.
+
+## License
+
+MIT License
