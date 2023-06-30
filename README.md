@@ -30,3 +30,9 @@ This currently underestimates for the first line person if the alert was escalat
 A script to work out when a given user is next on call for given schedule and
 rotation. These are set as environment variables the same as for
 oncall-hours.rb. It will output the date the user is next on call.
+
+### schedules.rb
+
+A script to output the schedules that are available in OpsGenie. This is useful
+for finding the ID of a schedule to use in the other scripts. It can also output
+the rotations and their ID for a given schedule.
