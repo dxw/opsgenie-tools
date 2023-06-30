@@ -24,3 +24,9 @@ A script to calculate the TOIL owed to people due to OOH alerts they have
 acknowledged. This gives a rough estimate of the TOIL owed so that the Line
 manager can be told how much the person should have claimed for their week.
 This currently underestimates for the first line person if the alert was escalated.
+
+### next-oncall.rb
+
+A script to work out when a given user is next on call for given schedule and
+rotation. These are set as environment variables the same as for
+oncall-hours.rb. It will output the date the user is next on call.
