@@ -25,6 +25,8 @@ opsgenie_date = ENV['OPSGENIE_DATE'] ? Date.parse(ENV['OPSGENIE_DATE']) : DateTi
 start_date = first_wednesday(opsgenie_date.year, opsgenie_date.month)
 end_date = first_wednesday(opsgenie_date.next_month.year, opsgenie_date.next_month.month)
 
+rotation_ids = ENV['OPSGENIE_ROTATION_ID'].split(',')
+
 schedule = Opsgenie::Schedule.find_by_id(ENV['OPSGENIE_SCHEDULE_ID'])
 
 timeline = schedule.timeline(date: start_date.to_date, interval: 2, interval_unit: :months)
@@ -32,7 +34,7 @@ timeline = schedule.timeline(date: start_date.to_date, interval: 2, interval_uni
 total_hours = Hash.new(0)
 
 timeline.each do |rotation|
-  next unless rotation.id == ENV['OPSGENIE_ROTATION_ID']
+  next unless rotation_ids.include?(rotation.id)
   rotation.periods.each do |period|
     next unless period.user
 
