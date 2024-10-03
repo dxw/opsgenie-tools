@@ -6,4 +6,4 @@ source "https://rubygems.org"
 
 gem "opsgenie-schedule", "~> 0.1.4"
 
-gem "dotenv", "~> 2.8"
+gem "dotenv", "~> 3.0"
