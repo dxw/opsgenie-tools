@@ -24,6 +24,9 @@ end
 opsgenie_date = ENV['OPSGENIE_DATE'] ? Date.parse(ENV['OPSGENIE_DATE']) : DateTime.now
 start_date = first_wednesday(opsgenie_date.year, opsgenie_date.month)
 end_date = first_wednesday(opsgenie_date.next_month.year, opsgenie_date.next_month.month)
+if ENV['DEBUG']
+puts "Calculating on call hours from #{start_date} to #{end_date}"
+end
 
 rotation_ids = ENV['OPSGENIE_ROTATION_ID'].split(',')
 
@@ -45,6 +48,10 @@ timeline.each do |rotation|
 
     on_call_hours = calculate_off_hours(period_start, period_end)
 
+    if ENV['DEBUG']
+    puts "#{period.user.full_name} was on call for #{on_call_hours} hours from #{period_start} to #{period_end} for rotation #{rotation.name}"
+    end
+
     total_hours[period.user.full_name] += on_call_hours
   end
 end
@@ -53,4 +60,8 @@ total_hours.each do |user_name, hours|
   payment = hours * ENV['PAYMENT_RATE'].to_f
   formatted_payment = sprintf('%.2f', payment)
   puts "#{user_name} was on call for #{hours} hours and should be paid £#{formatted_payment}."
+end
+if ENV['DEBUG']
+puts "Total hours: #{total_hours.values.sum}"
+puts "Total payment: £#{sprintf('%.2f', total_hours.values.sum * ENV['PAYMENT_RATE'].to_f)}"
 end
