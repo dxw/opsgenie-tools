@@ -14,7 +14,7 @@ Opsgenie.configure(api_key: ENV['OPSGENIE_API_KEY'])
 def first_wednesday(year, month)
   day = Date.new(year, month, 1)
   day += 1 until day.wday == 3
-  day.to_time + 13 * 60 * 60
+  day.to_time + 10 * 60 * 60
 end
 
 def calculate_off_hours(start_time, end_time)
