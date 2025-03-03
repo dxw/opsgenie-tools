@@ -8,7 +8,7 @@
 # LOOK_AHEAD_MONTHS: the number of months to look ahead for on-call periods (default: 6)
 # you can also set these variables in a .env file in the same directory as this script
 
-require 'date':
+require 'date'
 require 'opsgenie'
 require 'dotenv'
 require 'optparse'
