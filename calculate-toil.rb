@@ -70,13 +70,13 @@ loop do
 
     if alert_acknowledged
       if alert_tags.include?('sleepinghours')
-        if (alert_createdAt - last_acknowledged_time[alert_acknowledged_by]['sleepinghours']) > 3600
+        if (alert_createdAt - last_acknowledged_time[alert_acknowledged_by]['sleepinghours']) > 1800
           sleepinghours_ack_count[alert_acknowledged_by] += 1
           last_acknowledged_time[alert_acknowledged_by]['sleepinghours'] = alert_createdAt
           total_toil[alert_acknowledged_by] += toil_sleeping_hours
         end
       elsif alert_tags.include?('wakinghours')
-        if (alert_createdAt - last_acknowledged_time[alert_acknowledged_by]['wakinghours']) > 3600
+        if (alert_createdAt - last_acknowledged_time[alert_acknowledged_by]['wakinghours']) > 1800
           wakinghours_ack_count[alert_acknowledged_by] += 1
           last_acknowledged_time[alert_acknowledged_by]['wakinghours'] = alert_createdAt
           total_toil[alert_acknowledged_by] += toil_waking_hours
