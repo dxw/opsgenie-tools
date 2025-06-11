@@ -4,7 +4,9 @@
 #  OPSGENIE_API_KEY: API key for OpsGenie
 #  TAGS_TO_EXCLUDE: comma-separated list of tags to exclude from the search
 #  (e.g. TAGS_TO_EXCLUDE=tag1,tag2,tag3)
-#  Note: the script will prompt for the tag to add to the alerts
+#  CLIENT_TO_BU_MAPPING: JSON string mapping client names to business unit tags
+#  (e.g. {"client1": "bu1", "client2": "bu2"})
+#  Note: the script will prompt for the tag to add to the alerts if no client match is found
 
 require 'net/http'
 require 'json'
@@ -82,6 +84,8 @@ end
 
 api_key = ENV['OPSGENIE_API_KEY']
 tags_to_exclude = ENV['TAGS_TO_EXCLUDE'].split(',')
+client_to_bu_mapping = JSON.parse(ENV['CLIENT_TO_BU_MAPPING'] || '{}')
+
 opsgenie = OpsGenie.new(api_key)
 
 alerts = opsgenie.alerts_without_tags(tags_to_exclude)
@@ -93,6 +97,27 @@ if alerts.empty?
 else
   alerts.each do |alert|
     puts "Alert ID: #{alert['id']}, Message: #{alert['message']}"
+
+    # Try to automatically tag based on client name
+    matched_bu = nil
+    client_to_bu_mapping.each do |client, bu|
+      if alert['message'].downcase.include?(client.downcase)
+        matched_bu = bu
+        break
+      end
+    end
+
+    if matched_bu
+      response = opsgenie.add_tag_to_alert(alert['id'], matched_bu)
+      if %w[200 202].include?(response.code)
+        puts "Automatically added tag '#{matched_bu}' to alert '#{alert['id']}' based on client name."
+      else
+        puts "Error: Unable to add tag '#{matched_bu}' to alert '#{alert['id']}' (status code: #{response.code})"
+      end
+      next
+    end
+
+    # If no match, prompt the user
     new_tag = prompt_for_tag(tags_to_exclude + ['skip'])
     if new_tag == 'skip'
       untagged_alerts << alert
