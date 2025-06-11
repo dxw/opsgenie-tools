@@ -42,6 +42,7 @@ class OpsGenie
         alerts = JSON.parse(response.body)['data']
         all_alerts += alerts
         break if alerts.length < limit
+
         offset += limit
       else
         puts "Error: Unable to fetch alerts from OpsGenie (status code: #{response.code})"
@@ -60,11 +61,9 @@ class OpsGenie
     request['Content-Type'] = 'application/json'
     request.body = { tags: [tag] }.to_json
 
-    response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
+    Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
       http.request(request)
     end
-
-    response
   end
 
   def alert_link(alert_id)
@@ -124,7 +123,7 @@ else
       next
     end
     response = opsgenie.add_tag_to_alert(alert['id'], new_tag)
-    if response.code == '200' || response.code == '202'
+    if %w[200 202].include?(response.code)
       puts "Added tag '#{new_tag}' to alert '#{alert['id']}'."
     else
       puts "Error: Unable to add tag '#{new_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
