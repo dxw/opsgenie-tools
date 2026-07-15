@@ -38,3 +38,22 @@ def month_windows(start_date, end_date)
   end
   windows
 end
+
+# Count alerts per calendar day, emitting a row for every day in the range
+# (inclusive of days with zero alerts).
+def daily_counts(alerts, start_date, end_date)
+  counts = Hash.new(0)
+  alerts.each do |alert|
+    day = Time.parse(alert["createdAt"]).strftime("%Y-%m-%d")
+    counts[day] += 1
+  end
+
+  rows = []
+  day = start_date
+  while day < end_date
+    key = day.strftime("%Y-%m-%d")
+    rows << [key, counts[key]]
+    day += 1
+  end
+  rows
+end
