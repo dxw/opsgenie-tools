@@ -57,3 +57,17 @@ def daily_counts(alerts, start_date, end_date)
   end
   rows
 end
+
+# Count alerts per calendar month, one row per month in the range.
+def monthly_totals(alerts, start_date, end_date)
+  counts = Hash.new(0)
+  alerts.each do |alert|
+    month = Time.parse(alert["createdAt"]).strftime("%Y-%m")
+    counts[month] += 1
+  end
+
+  month_windows(start_date, end_date).map do |window_start, _window_end|
+    key = window_start.strftime("%Y-%m")
+    [key, counts[key]]
+  end
+end
