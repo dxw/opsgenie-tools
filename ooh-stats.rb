@@ -106,3 +106,67 @@ def monthly_toil(alerts, start_date, end_date, sleeping_rate, waking_rate)
     [key, toil_by_month[key]]
   end
 end
+
+# Fetch all OOH-tagged alerts in [start_date, end_date), one month per query
+# window to stay under OpsGenie's offset+limit <= 20000 ceiling.
+def fetch_ooh_alerts(api_key, start_date, end_date)
+  all_alerts = []
+  month_windows(start_date, end_date).each do |window_start, window_end|
+    offset = 0
+    loop do
+      formatted_start = Time.parse(window_start.to_s).strftime("%d-%m-%YT%H:%M:%S")
+      formatted_end   = Time.parse(window_end.to_s).strftime("%d-%m-%YT%H:%M:%S")
+      query = "createdAt >= '#{formatted_start}' AND createdAt < '#{formatted_end}' AND tags:(OOH)"
+      url = "#{BASE_URL}?limit=#{LIMIT}&offset=#{offset}&query=#{URI.encode_www_form_component(query)}"
+      response = HTTParty.get(url, headers: {
+        "Authorization" => "GenieKey #{api_key}",
+        "Content-Type"  => "application/json"
+      })
+      if response.code != 200
+        puts "Error fetching alerts: #{response.body}"
+        exit 1
+      end
+      alerts = JSON.parse(response.body)["data"] || []
+      break if alerts.empty?
+      all_alerts.concat(alerts)
+      offset += LIMIT
+    end
+  end
+  all_alerts
+end
+
+if __FILE__ == $0
+  api_key = ENV['OPSGENIE_API_KEY']
+  unless api_key
+    puts "Error: Please set the OPSGENIE_API_KEY environment variable."
+    exit 1
+  end
+
+  sleeping_rate = ENV['TOIL_SLEEPING_HOURS'] ? ENV['TOIL_SLEEPING_HOURS'].to_f : 0.0
+  waking_rate   = ENV['TOIL_WAKING_HOURS'] ? ENV['TOIL_WAKING_HOURS'].to_f : 0.0
+  years_back    = ENV['YEARS_BACK'] ? ENV['YEARS_BACK'].to_i : 3
+
+  end_date   = Date.today + 1
+  start_date = end_date.prev_year(years_back)
+
+  puts "Fetching OOH alerts from #{start_date} to #{end_date}..."
+  alerts = fetch_ooh_alerts(api_key, start_date, end_date)
+  puts "Fetched #{alerts.size} OOH alerts."
+
+  CSV.open("ooh_daily_counts.csv", "w") do |csv|
+    csv << ["date", "count"]
+    daily_counts(alerts, start_date, end_date).each { |row| csv << row }
+  end
+
+  CSV.open("ooh_monthly_totals.csv", "w") do |csv|
+    csv << ["month", "count"]
+    monthly_totals(alerts, start_date, end_date).each { |row| csv << row }
+  end
+
+  CSV.open("ooh_monthly_toil.csv", "w") do |csv|
+    csv << ["month", "toil_hours"]
+    monthly_toil(alerts, start_date, end_date, sleeping_rate, waking_rate).each { |row| csv << row }
+  end
+
+  puts "Wrote ooh_daily_counts.csv, ooh_monthly_totals.csv, ooh_monthly_toil.csv"
+end
