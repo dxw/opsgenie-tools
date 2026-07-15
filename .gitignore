@@ -1,1 +1,9 @@
 .env
+
+# ooh-stats.rb output
+ooh_daily_counts.csv
+ooh_monthly_totals.csv
+ooh_monthly_toil.csv
+
+# superpowers SDD scratch
+.superpowers/
