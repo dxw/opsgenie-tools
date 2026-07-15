@@ -71,3 +71,38 @@ def monthly_totals(alerts, start_date, end_date)
     [key, counts[key]]
   end
 end
+
+# Estimate monthly TOIL from acknowledged OOH alerts, mirroring calculate-toil.rb:
+# sleepinghours-tagged alerts use sleeping_rate, wakinghours use waking_rate.
+# Per user and category, alerts within 1800s of the previous counted one are
+# treated as duplicates and skipped.
+def monthly_toil(alerts, start_date, end_date, sleeping_rate, waking_rate)
+  toil_by_month = Hash.new(0.0)
+  # last_counted[user][category] = Time
+  last_counted = Hash.new { |h, k| h[k] = Hash.new(Time.at(0)) }
+
+  ordered = alerts.sort_by { |a| Time.parse(a["createdAt"]) }
+  ordered.each do |alert|
+    next unless alert["acknowledged"]
+    tags = alert["tags"] || []
+    category, rate =
+      if tags.include?("sleepinghours")
+        ["sleepinghours", sleeping_rate]
+      elsif tags.include?("wakinghours")
+        ["wakinghours", waking_rate]
+      end
+    next if category.nil?
+
+    user = alert.dig("report", "acknowledgedBy")
+    created = Time.parse(alert["createdAt"])
+    next unless (created - last_counted[user][category]) > 1800
+
+    last_counted[user][category] = created
+    toil_by_month[created.strftime("%Y-%m")] += rate
+  end
+
+  month_windows(start_date, end_date).map do |window_start, _window_end|
+    key = window_start.strftime("%Y-%m")
+    [key, toil_by_month[key]]
+  end
+end
