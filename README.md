@@ -48,6 +48,16 @@ A script to tag untagged alerts with a business unit tag. It can automatically t
 
 If an alert message does not contain any of the specified client names, the script will fall back to prompting you to choose a tag to add.
 
+### client_tags.rb
+
+A script to tag alerts that have no `client_*` tag with a client tag. It can automatically tag alerts by matching strings in the alert message to a client tag, and takes an optional argument for how many days back to search (default 30), e.g. `bundle exec client_tags.rb 90`.
+
+**Environment Variables:**
+* `OPSGENIE_API_KEY`: Your OpsGenie API key.
+* `CLIENT_TAG_MAPPING`: A JSON string that maps strings found in an alert message to client tags (e.g., `'{"dalmatian": "client_dalmatian", "caselaw": "client_moj"}'`). If a matching string is found in an alert's message, the corresponding client tag will be added automatically.
+
+If an alert message does not match any of the mapping keys, the script will fall back to prompting you to enter a client name (leave blank to skip).
+
 ## License
 
 MIT License
