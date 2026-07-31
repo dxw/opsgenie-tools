@@ -58,6 +58,26 @@ A script to tag alerts that have no `client_*` tag with a client tag. It can aut
 
 If an alert message does not match any of the mapping keys, the script will fall back to prompting you to enter a client name (leave blank to skip).
 
+### ooh-stats.rb
+
+A script to generate a spreadsheet (three CSV files) of OpsGenie alerts tagged
+`OOH` over the past few years. It writes:
+
+* `ooh_daily_counts.csv` — number of OOH alerts per calendar day (zero-filled).
+* `ooh_monthly_totals.csv` — number of OOH alerts per month.
+* `ooh_monthly_toil.csv` — a rough estimate of the TOIL claimed per month,
+  using the same sleeping/waking-hours logic as `calculate-toil.rb`.
+
+Usage: `bundle exec ruby ooh-stats.rb`
+
+**Environment Variables:**
+* `OPSGENIE_API_KEY`: Your OpsGenie API key (required).
+* `TOIL_SLEEPING_HOURS`: TOIL hours per de-duped acknowledged `sleepinghours` alert (default `0.0`).
+* `TOIL_WAKING_HOURS`: TOIL hours per de-duped acknowledged `wakinghours` alert (default `0.0`).
+* `YEARS_BACK`: How many years back to look (default `3`).
+
+These can be set in a `.env` file in the same directory as the script.
+
 ## License
 
 MIT License
