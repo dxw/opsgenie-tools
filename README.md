@@ -37,6 +37,17 @@ A script to output the schedules that are available in OpsGenie. This is useful
 for finding the ID of a schedule to use in the other scripts. It can also output
 the rotations and their ID for a given schedule.
 
+### tag_business_unit.rb
+
+A script to tag untagged alerts with a business unit tag. It can automatically tag alerts by matching client names in the alert message to a business unit.
+
+**Environment Variables:**
+* `OPSGENIE_API_KEY`: Your OpsGenie API key.
+* `TAGS_TO_EXCLUDE`: A comma-separated list of tags to identify business units (e.g., `bu1,bu2`). Alerts with these tags will be excluded from the search.
+* `CLIENT_TO_BU_MAPPING`: A JSON string that maps client names to business unit tags (e.g., `'{"clientA": "bu1", "clientB": "bu2"}'`). If a client name is found in an alert's message, the corresponding business unit tag will be added automatically.
+
+If an alert message does not contain any of the specified client names, the script will fall back to prompting you to choose a tag to add.
+
 ## License
 
 MIT License
