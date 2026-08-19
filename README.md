@@ -39,14 +39,21 @@ the rotations and their ID for a given schedule.
 
 ### tag_business_unit.rb
 
-A script to tag untagged alerts with a business unit tag. It can automatically tag alerts by matching client names in the alert message to a business unit.
+A script to tag untagged alerts with a business unit tag. It automatically tags alerts by mapping the alert's `client_*` tag to a business unit.
 
 **Environment Variables:**
 * `OPSGENIE_API_KEY`: Your OpsGenie API key.
 * `TAGS_TO_EXCLUDE`: A comma-separated list of tags to identify business units (e.g., `bu1,bu2`). Alerts with these tags will be excluded from the search.
-* `CLIENT_TO_BU_MAPPING`: A JSON string that maps client names to business unit tags (e.g., `'{"clientA": "bu1", "clientB": "bu2"}'`). If a client name is found in an alert's message, the corresponding business unit tag will be added automatically.
+* `CLIENT_TO_BU_MAPPING`: A JSON string that maps client tags to business unit tags (e.g., `'{"client_clientA": "bu1", "clientB": "bu2"}'`). The `client_` prefix is optional and keys are matched case-insensitively.
+* `CLIENT_TAG_MAPPING`: Optional, the same mapping used by `client_tags.rb`. When an alert has no `client_*` tag, the alert message is matched against these keys to work out which client tag it should have had.
 
-If an alert message does not contain any of the specified client names, the script will fall back to prompting you to choose a tag to add.
+Matching order for each alert:
+
+1. the alert's own `client_*` tag, looked up in `CLIENT_TO_BU_MAPPING`
+2. a client tag derived from the alert message via `CLIENT_TAG_MAPPING`, looked up in `CLIENT_TO_BU_MAPPING`
+3. a prompt to choose a tag (or skip)
+
+At the end of the run it prints suggested `CLIENT_TO_BU_MAPPING` additions for anything you tagged by hand, along with the full merged value to paste into your `.env`, and lists any alerts you skipped. Alerts with no `client_*` tag at all should be tagged with `client_tags.rb` first.
 
 ### client_tags.rb
 
