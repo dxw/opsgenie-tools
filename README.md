@@ -61,9 +61,13 @@ A script to tag alerts that have no `client_*` tag with a client tag. It can aut
 
 **Environment Variables:**
 * `OPSGENIE_API_KEY`: Your OpsGenie API key.
-* `CLIENT_TAG_MAPPING`: A JSON string that maps strings found in an alert message to client tags (e.g., `'{"dalmatian": "client_dalmatian", "caselaw": "client_moj"}'`). If a matching string is found in an alert's message, the corresponding client tag will be added automatically.
+* `CLIENT_TAG_MAPPING`: A JSON string that maps strings found in an alert message to client tags (e.g. `'{"dalmatian": "client_dalmatian", "caselaw": "client_moj"}'`). If a matching string is found in an alert's message, the corresponding client tag will be added automatically.
 
 If an alert message does not match any of the mapping keys, the script will fall back to prompting you to enter a client name (leave blank to skip).
+
+After tagging an alert by hand it offers strings from the message that could be used as a new `CLIENT_TAG_MAPPING` key: hostnames from any URL and hyphen separated segments of CloudWatch alarm names, with obvious noise (`prod`, `ecs`, `cpu`, `5xx` and so on) left out. You can also type your own or decline. Each candidate is checked against the client tagged alerts of the last two years and any that also match a different client's alerts are listed last, annotated with the tags they clash with.
+
+Anything you accept applies for the rest of the run, so repeat alerts for the same client are tagged automatically. At the end it prints the additions and the full merged `CLIENT_TAG_MAPPING` value to paste into your `.env`, plus a list of any alerts you skipped.
 
 ### ooh-stats.rb
 
