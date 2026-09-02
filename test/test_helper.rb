@@ -59,3 +59,4 @@ end
 Minitest::Test.include(TestHelpers)
 
 require "support/baseline"
+require "support/rota_stubs"

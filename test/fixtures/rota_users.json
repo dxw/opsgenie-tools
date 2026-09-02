@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "id": "user-1", "username": "first@example.invalid", "fullName": "First Example" },
+    { "id": "user-2", "username": "second@example.invalid", "fullName": "Second Example" }
+  ]
+}

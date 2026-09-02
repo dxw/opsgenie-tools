@@ -1,0 +1,26 @@
+{
+  "data": {
+    "finalTimeline": {
+      "rotations": [
+        {
+          "id": "rot-1",
+          "name": "Primary",
+          "periods": [
+            { "startDate": "2026-09-02T10:00:00Z", "endDate": "2026-09-09T10:00:00Z",
+              "recipient": { "id": "user-1" } },
+            { "startDate": "2026-09-09T10:00:00Z", "endDate": "2026-09-16T10:00:00Z",
+              "recipient": { "id": "user-2" } }
+          ]
+        },
+        {
+          "id": "rot-2",
+          "name": "Secondary",
+          "periods": [
+            { "startDate": "2026-09-02T10:00:00Z", "endDate": "2026-09-09T10:00:00Z",
+              "recipient": { "id": "user-2" } }
+          ]
+        }
+      ]
+    }
+  }
+}
