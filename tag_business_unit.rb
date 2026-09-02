@@ -76,13 +76,13 @@ end
 
 CLIENT_TAG_PREFIX = 'client_'
 
-def prompt_for_tag(tags)
+def prompt_for_tag(tags, input: $stdin)
   puts 'Which tag would you like to add?'
   tags.each_with_index do |tag, index|
     puts "#{index + 1}. #{tag}"
   end
   print "Enter the number corresponding to the desired tag or action (Default is #{tags.first}): "
-  tag_number = $stdin.gets.chomp.to_i
+  tag_number = input.gets.chomp.to_i
   tag_number.zero? ? tags.first : tags[tag_number - 1]
 end
 
@@ -137,73 +137,77 @@ def report_untagged(untagged_alerts, opsgenie)
   puts 'Alerts with no client tag can be tagged with client_tags.rb first.'
 end
 
-api_key = ENV['OPSGENIE_API_KEY']
-tags_to_exclude = ENV['TAGS_TO_EXCLUDE'].split(',')
-bu_mapping = normalise_bu_mapping(JSON.parse(ENV['CLIENT_TO_BU_MAPPING'] || '{}'))
-client_tag_mapping = JSON.parse(ENV['CLIENT_TAG_MAPPING'] || '{}')
+def main
+  api_key = ENV['OPSGENIE_API_KEY']
+  tags_to_exclude = ENV['TAGS_TO_EXCLUDE'].to_s.split(',')
+  bu_mapping = normalise_bu_mapping(JSON.parse(ENV['CLIENT_TO_BU_MAPPING'] || '{}'))
+  client_tag_mapping = JSON.parse(ENV['CLIENT_TAG_MAPPING'] || '{}')
 
-opsgenie = OpsGenie.new(api_key)
+  opsgenie = OpsGenie.new(api_key)
 
-alerts = opsgenie.alerts_without_tags(tags_to_exclude)
+  alerts = opsgenie.alerts_without_tags(tags_to_exclude)
 
-untagged_alerts = []
-suggestions = {}
+  untagged_alerts = []
+  suggestions = {}
 
-if alerts.empty?
-  puts 'No alerts found without the specified tags.'
-else
-  alerts.each do |alert|
-    puts "Alert ID: #{alert['id']}, Message: #{alert['message']}"
+  if alerts.empty?
+    puts 'No alerts found without the specified tags.'
+  else
+    alerts.each do |alert|
+      puts "Alert ID: #{alert['id']}, Message: #{alert['message']}"
 
-    # Prefer the alert's own client_* tag, then fall back to matching the
-    # message against CLIENT_TAG_MAPPING as client_tags.rb does
-    client_tag = client_tag_on_alert(alert)
-    matched_bu = client_tag && bu_mapping[client_tag]
+      # Prefer the alert's own client_* tag, then fall back to matching the
+      # message against CLIENT_TAG_MAPPING as client_tags.rb does
+      client_tag = client_tag_on_alert(alert)
+      matched_bu = client_tag && bu_mapping[client_tag]
 
-    if matched_bu
-      puts "Matched client tag '#{client_tag}'."
-    else
-      message_tag = client_tag_from_message(alert['message'], client_tag_mapping)
-      if message_tag && bu_mapping[message_tag]
-        client_tag = message_tag
-        matched_bu = bu_mapping[message_tag]
-        puts "No usable client tag, matched '#{client_tag}' from the alert message."
-      elsif client_tag
-        puts "Client tag '#{client_tag}' is not in CLIENT_TO_BU_MAPPING."
+      if matched_bu
+        puts "Matched client tag '#{client_tag}'."
       else
-        client_tag = message_tag
-        puts 'No client tag found for this alert.'
+        message_tag = client_tag_from_message(alert['message'], client_tag_mapping)
+        if message_tag && bu_mapping[message_tag]
+          client_tag = message_tag
+          matched_bu = bu_mapping[message_tag]
+          puts "No usable client tag, matched '#{client_tag}' from the alert message."
+        elsif client_tag
+          puts "Client tag '#{client_tag}' is not in CLIENT_TO_BU_MAPPING."
+        else
+          client_tag = message_tag
+          puts 'No client tag found for this alert.'
+        end
       end
-    end
 
-    if matched_bu
-      response = opsgenie.add_tag_to_alert(alert['id'], matched_bu)
+      if matched_bu
+        response = opsgenie.add_tag_to_alert(alert['id'], matched_bu)
+        if %w[200 202].include?(response.code)
+          puts "Automatically added tag '#{matched_bu}' to alert '#{alert['id']}' based on client tag '#{client_tag}'."
+        else
+          puts "Error: Unable to add tag '#{matched_bu}' to alert '#{alert['id']}' (status code: #{response.code})"
+        end
+        next
+      end
+
+      # If no match, prompt the user
+      new_tag = prompt_for_tag(tags_to_exclude + ['skip'])
+      if new_tag == 'skip'
+        untagged_alerts << alert
+        next
+      end
+      response = opsgenie.add_tag_to_alert(alert['id'], new_tag)
       if %w[200 202].include?(response.code)
-        puts "Automatically added tag '#{matched_bu}' to alert '#{alert['id']}' based on client tag '#{client_tag}'."
+        puts "Added tag '#{new_tag}' to alert '#{alert['id']}'."
+        if client_tag
+          suggestions[client_tag] ||= {}
+          suggestions[client_tag][new_tag] = suggestions[client_tag].fetch(new_tag, 0) + 1
+        end
       else
-        puts "Error: Unable to add tag '#{matched_bu}' to alert '#{alert['id']}' (status code: #{response.code})"
+        puts "Error: Unable to add tag '#{new_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
       end
-      next
-    end
-
-    # If no match, prompt the user
-    new_tag = prompt_for_tag(tags_to_exclude + ['skip'])
-    if new_tag == 'skip'
-      untagged_alerts << alert
-      next
-    end
-    response = opsgenie.add_tag_to_alert(alert['id'], new_tag)
-    if %w[200 202].include?(response.code)
-      puts "Added tag '#{new_tag}' to alert '#{alert['id']}'."
-      if client_tag
-        suggestions[client_tag] ||= {}
-        suggestions[client_tag][new_tag] = suggestions[client_tag].fetch(new_tag, 0) + 1
-      end
-    else
-      puts "Error: Unable to add tag '#{new_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
     end
   end
+
+  report_suggestions(suggestions, bu_mapping)
+  report_untagged(untagged_alerts, opsgenie)
 end
 
-report_suggestions(suggestions, bu_mapping)
-report_untagged(untagged_alerts, opsgenie)
+main if __FILE__ == $0

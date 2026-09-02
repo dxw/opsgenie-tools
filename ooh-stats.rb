@@ -135,7 +135,7 @@ def fetch_ooh_alerts(api_key, start_date, end_date)
   all_alerts
 end
 
-if __FILE__ == $0
+def main
   api_key = ENV['OPSGENIE_API_KEY']
   unless api_key
     puts "Error: Please set the OPSGENIE_API_KEY environment variable."
@@ -170,3 +170,5 @@ if __FILE__ == $0
 
   puts "Wrote ooh_daily_counts.csv, ooh_monthly_totals.csv, ooh_monthly_toil.csv"
 end
+
+main if __FILE__ == $0

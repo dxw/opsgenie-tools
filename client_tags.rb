@@ -84,9 +84,9 @@ class OpsGenie
   end
 end
 
-def prompt_for_client_tag
+def prompt_for_client_tag(input: $stdin)
   print 'Enter client name for the tag (client_$clientname), or leave blank to skip: '
-  client_name = $stdin.gets.chomp
+  client_name = input.gets.chomp
   return 'skip' if client_name.empty?
 
   "client_#{client_name}"
@@ -137,7 +137,7 @@ def needle_collisions(needle, tag, reference_alerts)
     .tally
 end
 
-def prompt_for_needle(message, tag, reference_alerts)
+def prompt_for_needle(message, tag, reference_alerts, input: $stdin)
   candidates = candidate_needles(message).map do |needle|
     [needle, needle_collisions(needle, tag, reference_alerts)]
   end
@@ -153,12 +153,12 @@ def prompt_for_needle(message, tag, reference_alerts)
   puts "#{candidates.length + 2}. do not add a mapping"
   print 'Enter the number corresponding to the desired match: '
 
-  choice = $stdin.gets.to_s.chomp.to_i
+  choice = input.gets.to_s.chomp.to_i
   return candidates[choice - 1].first if choice.between?(1, candidates.length)
   return nil unless choice == candidates.length + 1
 
   print 'Enter the string that should match this client: '
-  own = $stdin.gets.to_s.chomp.downcase
+  own = input.gets.to_s.chomp.downcase
   own.empty? ? nil : own
 end
 
@@ -181,70 +181,74 @@ end
 # how far back to look for alerts to compare a candidate mapping needle against
 REFERENCE_DAYS = 730
 
-days = ARGV[0] ? ARGV[0].to_i : 30
-api_key = ENV['OPSGENIE_API_KEY']
-client_tag_mapping = JSON.parse(ENV['CLIENT_TAG_MAPPING'] || '{}')
+def main
+  days = ARGV[0] ? ARGV[0].to_i : 30
+  api_key = ENV['OPSGENIE_API_KEY']
+  client_tag_mapping = JSON.parse(ENV['CLIENT_TAG_MAPPING'] || '{}')
 
-opsgenie = OpsGenie.new(api_key)
+  opsgenie = OpsGenie.new(api_key)
 
-puts "Looking for alerts without a client tag from the last #{days} days..."
-alerts = opsgenie.alerts_without_client_tags(days)
+  puts "Looking for alerts without a client tag from the last #{days} days..."
+  alerts = opsgenie.alerts_without_client_tags(days)
 
-untagged_alerts = []
-additions = {}
-reference_alerts = nil
+  untagged_alerts = []
+  additions = {}
+  reference_alerts = nil
 
-if alerts.empty?
-  puts 'No alerts found without a client tag.'
-else
-  alerts.each do |alert|
-    puts "Alert ID: #{alert['id']}, Message: #{alert['message']}"
+  if alerts.empty?
+    puts 'No alerts found without a client tag.'
+  else
+    alerts.each do |alert|
+      puts "Alert ID: #{alert['id']}, Message: #{alert['message']}"
 
-    # Try to automatically tag based on client name in the message
-    matched_tag = nil
-    client_tag_mapping.each do |needle, tag|
-      if alert['message'].to_s.downcase.include?(needle.downcase)
-        matched_tag = tag
-        break
+      # Try to automatically tag based on client name in the message
+      matched_tag = nil
+      client_tag_mapping.each do |needle, tag|
+        if alert['message'].to_s.downcase.include?(needle.downcase)
+          matched_tag = tag
+          break
+        end
       end
-    end
 
-    if matched_tag
-      response = opsgenie.add_tag_to_alert(alert['id'], matched_tag)
-      if %w[200 202].include?(response.code)
-        puts "Automatically added tag '#{matched_tag}' to alert '#{alert['id']}' based on client name."
-      else
-        puts "Error: Unable to add tag '#{matched_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
+      if matched_tag
+        response = opsgenie.add_tag_to_alert(alert['id'], matched_tag)
+        if %w[200 202].include?(response.code)
+          puts "Automatically added tag '#{matched_tag}' to alert '#{alert['id']}' based on client name."
+        else
+          puts "Error: Unable to add tag '#{matched_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
+        end
+        next
       end
-      next
-    end
 
-    # If no match, prompt the user
-    new_tag = prompt_for_client_tag
-    if new_tag == 'skip'
-      untagged_alerts << alert
-      next
-    end
-    response = opsgenie.add_tag_to_alert(alert['id'], new_tag)
-    unless %w[200 202].include?(response.code)
-      puts "Error: Unable to add tag '#{new_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
-      next
-    end
+      # If no match, prompt the user
+      new_tag = prompt_for_client_tag
+      if new_tag == 'skip'
+        untagged_alerts << alert
+        next
+      end
+      response = opsgenie.add_tag_to_alert(alert['id'], new_tag)
+      unless %w[200 202].include?(response.code)
+        puts "Error: Unable to add tag '#{new_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
+        next
+      end
 
-    puts "Added tag '#{new_tag}' to alert '#{alert['id']}'."
+      puts "Added tag '#{new_tag}' to alert '#{alert['id']}'."
 
-    reference_alerts ||= begin
-      puts "Fetching client tagged alerts from the last #{REFERENCE_DAYS} days to check suggestions against..."
-      opsgenie.alerts_with_client_tags(REFERENCE_DAYS)
+      reference_alerts ||= begin
+        puts "Fetching client tagged alerts from the last #{REFERENCE_DAYS} days to check suggestions against..."
+        opsgenie.alerts_with_client_tags(REFERENCE_DAYS)
+      end
+      needle = prompt_for_needle(alert['message'], new_tag, reference_alerts)
+      next if needle.nil?
+
+      additions[needle] = new_tag
+      # so the rest of this run tags matching alerts automatically
+      client_tag_mapping[needle] = new_tag
     end
-    needle = prompt_for_needle(alert['message'], new_tag, reference_alerts)
-    next if needle.nil?
-
-    additions[needle] = new_tag
-    # so the rest of this run tags matching alerts automatically
-    client_tag_mapping[needle] = new_tag
   end
+
+  report_suggestions(additions, client_tag_mapping)
+  report_untagged(untagged_alerts, opsgenie)
 end
 
-report_suggestions(additions, client_tag_mapping)
-report_untagged(untagged_alerts, opsgenie)
+main if __FILE__ == $0

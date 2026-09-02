@@ -27,12 +27,8 @@ require 'date'
 require 'time'
 require 'uri'
 
-# Ensure the Opsgenie API key is available as an environment variable.
+# Opsgenie API key, checked in main so loading the script does not exit.
 OPSGENIE_API_KEY = ENV['OPSGENIE_API_KEY']
-unless OPSGENIE_API_KEY
-  puts "Error: Please set the OPSGENIE_API_KEY environment variable."
-  exit 1
-end
 
 BASE_URL = "https://api.opsgenie.com/v2/alerts"
 LIMIT = 100
@@ -190,22 +186,29 @@ def output_summary(summary, time_tags, business_units)
   end
 end
 
-if __FILE__ == $0
+def main
+  unless OPSGENIE_API_KEY
+    puts "Error: Please set the OPSGENIE_API_KEY environment variable."
+    exit 1
+  end
+
   options = parse_options
   start_date, end_date = determine_date_range(options)
   # Convert dates to Time objects (using midnight for each day).
   start_time = Time.parse(start_date.to_s)
   end_time   = Time.parse(end_date.to_s)
-  
+
   # Format times for display.
   formatted_start = start_time.strftime("%d-%m-%YT%H:%M:%S")
   formatted_end   = end_time.strftime("%d-%m-%YT%H:%M:%S")
   puts "Fetching alerts from #{formatted_start} to #{formatted_end}..."
-  
+
   alerts = fetch_alerts(start_time, end_time)
   summary, business_units, time_tags = process_alerts(alerts)
-  
+
   total_alerts = alerts.size
   puts "\nTotal alerts processed: #{total_alerts}"
   output_summary(summary, time_tags, business_units)
 end
+
+main if __FILE__ == $0
