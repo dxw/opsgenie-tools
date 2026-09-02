@@ -1,0 +1,10 @@
+[
+  {
+    "tinyId": "77",
+    "id": "aaaaaaaa-0000-0000-0000-000000000077",
+    "message": "ALARM: \"ecs-asg-cpu-alpha-prod\" in EU (London)",
+    "acknowledged": false,
+    "createdAt": null,
+    "tags": ["OOH", "sleepinghours", "client_alpha"]
+  }
+]

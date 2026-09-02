@@ -1,0 +1,13 @@
+Alert ID: aaaaaaaa-0000-0000-0000-000000000101, Message: ALARM: "ecs-asg-cpu-alpha-prod" in EU (London)
+No usable client tag, matched 'client_alpha' from the alert message.
+Automatically added tag 'govpress' to alert 'aaaaaaaa-0000-0000-0000-000000000101' based on client tag 'client_alpha'.
+Alert ID: aaaaaaaa-0000-0000-0000-000000000102, Message: [Updown.io] Response timeout (30 seconds) https://status.example.com
+No client tag found for this alert.
+Which tag would you like to add?
+1. govpress
+2. deliveryplus
+3. skip
+Enter the number corresponding to the desired tag or action (Default is govpress): 
+Skipped 1 alert(s):
+  https://app.opsgenie.com/alert/detail/aaaaaaaa-0000-0000-0000-000000000102 (no client tag) [Updown.io] Response timeout (30 seconds) https://status.example.com
+Alerts with no client tag can be tagged with client_tags.rb first.

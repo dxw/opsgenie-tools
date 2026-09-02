@@ -1,0 +1,18 @@
+[
+  {
+    "tinyId": "1",
+    "id": "aaaaaaaa-0000-0000-0000-000000000101",
+    "message": "ALARM: \"ecs-asg-cpu-alpha-prod\" in EU (London)",
+    "acknowledged": false,
+    "createdAt": "2026-08-27T10:00:00.000Z",
+    "tags": []
+  },
+  {
+    "tinyId": "2",
+    "id": "aaaaaaaa-0000-0000-0000-000000000102",
+    "message": "[Updown.io] Response timeout (30 seconds) https://status.example.com",
+    "acknowledged": false,
+    "createdAt": "2026-08-27T11:00:00.000Z",
+    "tags": []
+  }
+]

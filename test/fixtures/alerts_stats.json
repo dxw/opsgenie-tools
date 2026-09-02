@@ -1,0 +1,45 @@
+[
+  {
+    "tinyId": "1",
+    "id": "aaaaaaaa-0000-0000-0000-000000000201",
+    "message": "ALARM: \"ecs-asg-cpu-alpha-prod\" in EU (London)",
+    "acknowledged": true,
+    "report": { "acknowledgedBy": "first@example.invalid" },
+    "createdAt": "2026-08-25T09:00:00.000Z",
+    "tags": ["deliveryplus", "OOH", "client_alpha"]
+  },
+  {
+    "tinyId": "2",
+    "id": "aaaaaaaa-0000-0000-0000-000000000202",
+    "message": "[Updown.io] Response timeout (30 seconds) https://status.example.com",
+    "acknowledged": true,
+    "report": { "acknowledgedBy": "first@example.invalid" },
+    "createdAt": "2026-08-25T10:00:00.000Z",
+    "tags": ["govpress", "inhours", "client_beta"]
+  },
+  {
+    "tinyId": "3",
+    "id": "aaaaaaaa-0000-0000-0000-000000000203",
+    "message": "ALARM: \"cloudfront-5xx-beta\" in US East (N. Virginia)",
+    "acknowledged": true,
+    "report": { "acknowledgedBy": "first@example.invalid" },
+    "createdAt": "2026-08-25T11:00:00.000Z",
+    "tags": ["govpress", "wakinghours"]
+  },
+  {
+    "tinyId": "4",
+    "id": "aaaaaaaa-0000-0000-0000-000000000204",
+    "message": "[Updown.io] Response timeout (30 seconds) https://status.example.com/health",
+    "acknowledged": false,
+    "createdAt": "2026-08-25T12:00:00.000Z",
+    "tags": ["govpress"]
+  },
+  {
+    "tinyId": "5",
+    "id": "aaaaaaaa-0000-0000-0000-000000000205",
+    "message": "[Updown.io] Response timeout (30 seconds) https://status.example.com/check",
+    "acknowledged": false,
+    "createdAt": "2026-08-25T13:00:00.000Z",
+    "tags": ["sleepinghours"]
+  }
+]
