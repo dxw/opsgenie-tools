@@ -11,102 +11,34 @@
 #  Note: the script will prompt for the tag to add to the alerts if no client match is
 #  found, and will suggest CLIENT_TO_BU_MAPPING additions for anything tagged by hand
 
-require 'net/http'
-require 'json'
-require 'dotenv'
-require 'date'
+require "json"
+require "dotenv"
+require "date"
+require_relative "lib/opsgenie_tools"
 
 Dotenv.load
-
-class OpsGenie
-  def initialize(api_key)
-    @api_key = api_key
-  end
-
-  def alerts_without_tags(tags)
-    query = "NOT (tags:#{tags.join(' OR tags:')})"
-    date_threshold = (Date.today - 30).strftime('%d-%m-%Y')
-    query += " AND createdAt>#{date_threshold}"
-    all_alerts = []
-    offset = 0
-    limit = 100
-
-    loop do
-      uri = URI("https://api.opsgenie.com/v2/alerts?query=#{URI.encode_www_form_component(query)}&limit=#{limit}&offset=#{offset}")
-
-      request = Net::HTTP::Get.new(uri)
-      request['Authorization'] = "GenieKey #{@api_key}"
-
-      response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
-        http.request(request)
-      end
-
-      if response.code == '200'
-        alerts = JSON.parse(response.body)['data']
-        all_alerts += alerts
-        break if alerts.length < limit
-
-        offset += limit
-      else
-        puts "Error: Unable to fetch alerts from OpsGenie (status code: #{response.code})"
-        break
-      end
-    end
-
-    all_alerts
-  end
-
-  def add_tag_to_alert(alert_id, tag)
-    uri = URI("https://api.opsgenie.com/v2/alerts/#{alert_id}/tags")
-
-    request = Net::HTTP::Post.new(uri)
-    request['Authorization'] = "GenieKey #{@api_key}"
-    request['Content-Type'] = 'application/json'
-    request.body = { tags: [tag] }.to_json
-
-    Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
-      http.request(request)
-    end
-  end
-
-  def alert_link(alert_id)
-    "https://app.opsgenie.com/alert/detail/#{alert_id}"
-  end
-end
-
-CLIENT_TAG_PREFIX = 'client_'
 
 def prompt_for_tag(tags, input: $stdin)
   puts 'Which tag would you like to add?'
   tags.each_with_index do |tag, index|
     puts "#{index + 1}. #{tag}"
   end
-  print "Enter the number corresponding to the desired tag or action (Default is #{tags.first}): "
-  tag_number = input.gets.chomp.to_i
-  tag_number.zero? ? tags.first : tags[tag_number - 1]
-end
 
-# keys may be given with or without the client_ prefix
-def normalise_bu_mapping(mapping)
-  mapping.each_with_object({}) do |(client, bu), normalised|
-    key = client.downcase
-    key = "#{CLIENT_TAG_PREFIX}#{key}" unless key.start_with?(CLIENT_TAG_PREFIX)
-    normalised[key] = bu
+  loop do
+    print "Enter the number corresponding to the desired tag or action (Default is #{tags.first}): "
+    answer = input.gets
+    # nil means stdin is at EOF. Pressing enter selects the default tag, but at
+    # EOF nobody chose it, so skip rather than tag every remaining alert with it
+    return 'skip' if answer.nil?
+
+    choice = answer.chomp.to_i
+    return tags.first if choice.zero?
+    return tags[choice - 1] if choice.between?(1, tags.length)
+
+    # an out of range answer used to return nil, which reached the API as a
+    # request to add no tag at all
+    puts "There is no option #{choice}."
   end
-end
-
-def client_tag_on_alert(alert)
-  alert.fetch('tags', []).map(&:downcase).find do |tag|
-    # ignore the bare 'client_' tag some alerts carry
-    tag.start_with?(CLIENT_TAG_PREFIX) && tag.length > CLIENT_TAG_PREFIX.length
-  end
-end
-
-def client_tag_from_message(message, client_tag_mapping)
-  return nil if message.nil?
-
-  _, tag = client_tag_mapping.find { |needle, _| message.downcase.include?(needle.downcase) }
-  tag&.downcase
 end
 
 # suggestions: client tag => { bu => times chosen }
@@ -126,26 +58,30 @@ def report_suggestions(suggestions, bu_mapping)
   puts "CLIENT_TO_BU_MAPPING=#{bu_mapping.merge(additions).to_json}"
 end
 
-def report_untagged(untagged_alerts, opsgenie)
+def report_untagged(untagged_alerts, client)
   return if untagged_alerts.empty?
 
   puts "\nSkipped #{untagged_alerts.length} alert(s):"
   untagged_alerts.each do |alert|
-    client_tag = client_tag_on_alert(alert) || 'no client tag'
-    puts "  #{opsgenie.alert_link(alert['id'])} (#{client_tag}) #{alert['message']}"
+    client_tag = OpsgenieTools::Tagging.client_tag_on_alert(alert) || 'no client tag'
+    puts "  #{client.alert_link(alert['id'])} (#{client_tag}) #{alert['message']}"
   end
   puts 'Alerts with no client tag can be tagged with client_tags.rb first.'
 end
 
 def main
   api_key = ENV['OPSGENIE_API_KEY']
-  tags_to_exclude = ENV['TAGS_TO_EXCLUDE'].to_s.split(',')
-  bu_mapping = normalise_bu_mapping(JSON.parse(ENV['CLIENT_TO_BU_MAPPING'] || '{}'))
+  tags_to_exclude = ENV['TAGS_TO_EXCLUDE'].to_s.split(',').map(&:strip).reject(&:empty?)
+  if tags_to_exclude.empty?
+    puts 'Error: Please set TAGS_TO_EXCLUDE to the business unit tags to exclude.'
+    exit 1
+  end
+  bu_mapping = OpsgenieTools::Tagging.normalise_bu_mapping(JSON.parse(ENV['CLIENT_TO_BU_MAPPING'] || '{}'))
   client_tag_mapping = JSON.parse(ENV['CLIENT_TAG_MAPPING'] || '{}')
 
-  opsgenie = OpsGenie.new(api_key)
+  client = OpsgenieTools::Client.new(api_key)
 
-  alerts = opsgenie.alerts_without_tags(tags_to_exclude)
+  alerts = client.alerts(OpsgenieTools::Query.without_tags(tags_to_exclude, since: Date.today - 30))
 
   untagged_alerts = []
   suggestions = {}
@@ -158,13 +94,13 @@ def main
 
       # Prefer the alert's own client_* tag, then fall back to matching the
       # message against CLIENT_TAG_MAPPING as client_tags.rb does
-      client_tag = client_tag_on_alert(alert)
+      client_tag = OpsgenieTools::Tagging.client_tag_on_alert(alert)
       matched_bu = client_tag && bu_mapping[client_tag]
 
       if matched_bu
         puts "Matched client tag '#{client_tag}'."
       else
-        message_tag = client_tag_from_message(alert['message'], client_tag_mapping)
+        message_tag = OpsgenieTools::Tagging.client_tag_from_message(alert['message'], client_tag_mapping)
         if message_tag && bu_mapping[message_tag]
           client_tag = message_tag
           matched_bu = bu_mapping[message_tag]
@@ -178,11 +114,11 @@ def main
       end
 
       if matched_bu
-        response = opsgenie.add_tag_to_alert(alert['id'], matched_bu)
-        if %w[200 202].include?(response.code)
+        begin
+          client.add_tag(alert['id'], matched_bu)
           puts "Automatically added tag '#{matched_bu}' to alert '#{alert['id']}' based on client tag '#{client_tag}'."
-        else
-          puts "Error: Unable to add tag '#{matched_bu}' to alert '#{alert['id']}' (status code: #{response.code})"
+        rescue OpsgenieTools::Error => e
+          puts "Error: Unable to add tag '#{matched_bu}' to alert '#{alert['id']}': #{e.message}"
         end
         next
       end
@@ -193,21 +129,27 @@ def main
         untagged_alerts << alert
         next
       end
-      response = opsgenie.add_tag_to_alert(alert['id'], new_tag)
-      if %w[200 202].include?(response.code)
-        puts "Added tag '#{new_tag}' to alert '#{alert['id']}'."
-        if client_tag
-          suggestions[client_tag] ||= {}
-          suggestions[client_tag][new_tag] = suggestions[client_tag].fetch(new_tag, 0) + 1
-        end
-      else
-        puts "Error: Unable to add tag '#{new_tag}' to alert '#{alert['id']}' (status code: #{response.code})"
+
+      begin
+        client.add_tag(alert['id'], new_tag)
+      rescue OpsgenieTools::Error => e
+        puts "Error: Unable to add tag '#{new_tag}' to alert '#{alert['id']}': #{e.message}"
+        next
+      end
+
+      puts "Added tag '#{new_tag}' to alert '#{alert['id']}'."
+      if client_tag
+        suggestions[client_tag] ||= {}
+        suggestions[client_tag][new_tag] = suggestions[client_tag].fetch(new_tag, 0) + 1
       end
     end
   end
 
   report_suggestions(suggestions, bu_mapping)
-  report_untagged(untagged_alerts, opsgenie)
+  report_untagged(untagged_alerts, client)
+rescue OpsgenieTools::Error => e
+  warn e.message
+  exit 1
 end
 
 main if __FILE__ == $0
