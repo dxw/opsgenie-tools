@@ -19,9 +19,8 @@ class OncallCharacterisationTest < Minitest::Test
     ENV.replace(@env)
   end
 
-  # The second line schedule returns nobody, which the script currently
-  # handles by leaving $second_slack_name at its previous value. This
-  # baseline therefore pins that defect; Task 7 fixes it and updates it.
+  # The second line schedule returns nobody, so this pins that a gap in the
+  # rota reads as "Nobody" rather than repeating the previous week's name.
   def test_output_is_unchanged
     stub_schedule("sched-1")
     stub_schedule("sched-2", name: "OOH Second Line")
@@ -34,5 +33,48 @@ class OncallCharacterisationTest < Minitest::Test
 
     assert_matches_baseline("oncall", out)
     assert_equal "", err
+  end
+
+  def test_both_lines_named_when_both_are_covered
+    stub_schedule("sched-1")
+    stub_schedule("sched-2", name: "OOH Second Line")
+    stub_on_calls("sched-1")
+    stub_on_calls("sched-2",
+                  body: { "data" => { "onCallParticipants" =>
+                          [{ "type" => "user", "name" => "second@example.invalid" }] } })
+    stub_users
+    load_script("oncall.rb")
+
+    out, = capture_io { Date.stub(:today, FROZEN_TODAY) { main } }
+
+    assert_match(/@first \/ @second/, out)
+    refute_match(/Nobody/, out)
+  end
+
+  # The old code assigned each week's name to a global inside the loop, so a
+  # week with nobody on call reprinted the previous week's name instead of
+  # showing the gap. This pins the fix against exactly that shape: week one
+  # is covered, week two is not.
+  def test_a_gap_does_not_repeat_the_previous_weeks_name
+    stub_schedule("sched-1")
+    stub_schedule("sched-2", name: "OOH Second Line")
+    stub_on_calls("sched-1")
+    stub_request(:get, %r{/v2/schedules/sched-2/on-calls})
+      .with(query: hash_including("date" => /2026-09-02/))
+      .to_return(status: 200, body: JSON.dump("data" => { "onCallParticipants" =>
+                 [{ "type" => "user", "name" => "second@example.invalid" }] }),
+                 headers: { "Content-Type" => "application/json" })
+    stub_request(:get, %r{/v2/schedules/sched-2/on-calls})
+      .with(query: hash_including("date" => /2026-09-09/))
+      .to_return(status: 200, body: JSON.dump("data" => { "onCallParticipants" => [] }),
+                 headers: { "Content-Type" => "application/json" })
+    stub_users
+    load_script("oncall.rb")
+
+    out, = capture_io { Date.stub(:today, FROZEN_TODAY) { main } }
+
+    lines = out.lines
+    assert_match(/2026-09-02: @first \/ @second/, lines[1])
+    assert_match(/2026-09-09: @first \/ Nobody/, lines[2])
   end
 end
