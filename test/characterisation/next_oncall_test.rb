@@ -41,4 +41,12 @@ class NextOncallCharacterisationTest < Minitest::Test
     assert_matches_baseline("next-oncall", out)
     assert_equal "", err
   end
+
+  def test_a_failed_schedule_lookup_aborts_the_run
+    stub_missing_schedule("sched-1")
+    load_script("next-oncall.rb")
+
+    error = assert_raises(SystemExit) { capture_io { main } }
+    assert_equal 1, error.status
+  end
 end
