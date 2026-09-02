@@ -3,69 +3,50 @@
 # usage: PAYMENT_RATE=10.00 OPSGENIE_API_KEY=yourkeyhere OPSGENIE_SCHEDULE_ID=youridhere OPSGENIE_ROTATION_ID=youridhere bundle exec oncall-hours.rb
 # you can also set OPSGENIE_DATE to a date in the month you want to calculate for, otherwise it will use the current date.
 # These can all be set in a .env file in the same directory as the script as well
-require 'dotenv'
-require 'opsgenie'
 require 'date'
+require 'dotenv'
+require_relative 'lib/opsgenie_tools'
 
 Dotenv.load
 
-Opsgenie.configure(api_key: ENV['OPSGENIE_API_KEY'])
-
-def first_wednesday(year, month)
-  day = Date.new(year, month, 1)
-  day += 1 until day.wday == 3
-  day.to_time + 10 * 60 * 60
-end
-
-def calculate_off_hours(start_time, end_time)
-  (end_time - start_time) / 3600 # calculate hours difference
-end
-
 def main
   opsgenie_date = ENV['OPSGENIE_DATE'] ? Date.parse(ENV['OPSGENIE_DATE']) : DateTime.now
-  start_date = first_wednesday(opsgenie_date.year, opsgenie_date.month)
-  end_date = first_wednesday(opsgenie_date.next_month.year, opsgenie_date.next_month.month)
+  start_date, end_date = OpsgenieTools::Payment.window_for(opsgenie_date)
   if ENV['DEBUG']
   puts "Calculating on call hours from #{start_date} to #{end_date}"
   end
 
-  rotation_ids = ENV['OPSGENIE_ROTATION_ID'].split(',')
-
-  schedule = Opsgenie::Schedule.find_by_id(ENV['OPSGENIE_SCHEDULE_ID'])
-
-  timeline = schedule.timeline(date: start_date.to_date, interval: 2, interval_unit: :months)
+  rotation_ids = ENV['OPSGENIE_ROTATION_ID'].to_s.split(',')
+  rota = OpsgenieTools::Rota.new(ENV['OPSGENIE_API_KEY'])
+  timeline = rota.timeline(ENV['OPSGENIE_SCHEDULE_ID'], from: start_date.to_date, months: 2)
 
   total_hours = Hash.new(0)
 
   timeline.each do |rotation|
     next unless rotation_ids.include?(rotation.id)
-    rotation.periods.each do |period|
-      next unless period.user
 
-      period_start = [start_date, period.start_date.to_time].max
-      period_end = [end_date, period.end_date.to_time].min
+    rotation_totals = OpsgenieTools::Payment.totals(rotation.periods, window: [start_date, end_date])
 
-      next if period_end < start_date || period_start > end_date
-
-      on_call_hours = calculate_off_hours(period_start, period_end)
-
-      if ENV['DEBUG']
-      puts "#{period.user.full_name} was on call for #{on_call_hours} hours from #{period_start} to #{period_end} for rotation #{rotation.name}"
+    if ENV['DEBUG']
+      rotation_totals.each do |user_name, hours|
+        puts "#{user_name} was on call for #{hours} hours from #{start_date} to #{end_date} for rotation #{rotation.name}"
       end
-
-      total_hours[period.user.full_name] += on_call_hours
     end
+
+    rotation_totals.each { |user_name, hours| total_hours[user_name] += hours }
   end
 
   total_hours.each do |user_name, hours|
-    payment = hours * ENV['PAYMENT_RATE'].to_f
-    formatted_payment = sprintf('%.2f', payment)
+    formatted_payment = OpsgenieTools::Payment.payment_for(hours, ENV['PAYMENT_RATE'].to_f)
     puts "#{user_name} was on call for #{hours} hours and should be paid £#{formatted_payment}."
   end
   if ENV['DEBUG']
   puts "Total hours: #{total_hours.values.sum}"
-  puts "Total payment: £#{sprintf('%.2f', total_hours.values.sum * ENV['PAYMENT_RATE'].to_f)}"
+  puts "Total payment: £#{OpsgenieTools::Payment.payment_for(total_hours.values.sum, ENV['PAYMENT_RATE'].to_f)}"
   end
+rescue OpsgenieTools::Error => e
+  warn e.message
+  exit 1
 end
 
 main if __FILE__ == $0
