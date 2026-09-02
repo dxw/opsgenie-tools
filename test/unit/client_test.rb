@@ -140,6 +140,60 @@ class ClientTest < Minitest::Test
     assert_match(/unparseable response from Opsgenie/, error.message)
   end
 
+  SCHEDULES_URL = "https://api.opsgenie.com/v2/schedules".freeze
+
+  def test_schedules_follows_paging_next
+    stub_request(:get, SCHEDULES_URL).with(query: { "limit" => "100", "offset" => "0" })
+      .to_return(status: 200,
+                 body: JSON.dump("data" => [{ "id" => "sched-1" }],
+                                 "paging" => { "next" => "#{SCHEDULES_URL}?offset=100" }))
+    stub_request(:get, SCHEDULES_URL).with(query: { "limit" => "100", "offset" => "100" })
+      .to_return(status: 200,
+                 body: JSON.dump("data" => [{ "id" => "sched-2" }], "paging" => {}))
+
+    assert_equal %w[sched-1 sched-2], @client.schedules.map { |s| s["id"] }
+  end
+
+  def test_schedules_stops_when_paging_is_absent
+    stub_request(:get, SCHEDULES_URL).with(query: { "limit" => "100", "offset" => "0" })
+      .to_return(status: 200, body: JSON.dump("data" => [{ "id" => "sched-1" }]))
+
+    assert_equal 1, @client.schedules.length
+    assert_not_requested(:get, SCHEDULES_URL, query: hash_including("offset" => "100"))
+  end
+
+  def test_schedules_raises_on_a_non_200
+    stub_request(:get, SCHEDULES_URL).with(query: hash_including("limit" => "100"))
+      .to_return(status: 401, body: "unauthorised")
+
+    error = assert_raises(OpsgenieTools::Error) { @client.schedules }
+    assert_match(/HTTP 401/, error.message)
+  end
+
+  def test_schedules_names_the_failing_page_not_just_the_path
+    stub_request(:get, SCHEDULES_URL).with(query: hash_including("offset" => "0"))
+      .to_return(status: 500, body: "boom")
+
+    error = assert_raises(OpsgenieTools::Error) { @client.schedules }
+    assert_match(/offset=0/, error.message)
+    assert_match(/limit=100/, error.message)
+  end
+
+  def test_schedule_returns_one_schedule
+    stub_request(:get, "#{SCHEDULES_URL}/sched-1")
+      .to_return(status: 200,
+                 body: JSON.dump("data" => { "id" => "sched-1",
+                                             "rotations" => [{ "id" => "rot-1" }] }))
+
+    assert_equal "rot-1", @client.schedule("sched-1")["rotations"].first["id"]
+  end
+
+  def test_schedule_raises_on_a_non_200
+    stub_request(:get, "#{SCHEDULES_URL}/sched-1").to_return(status: 404, body: "nope")
+
+    assert_raises(OpsgenieTools::Error) { @client.schedule("sched-1") }
+  end
+
   def test_alert_link
     assert_equal "https://app.opsgenie.com/alert/detail/abc-123",
                  @client.alert_link("abc-123")

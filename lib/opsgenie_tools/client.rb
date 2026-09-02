@@ -7,6 +7,7 @@ module OpsgenieTools
   class Client
     HOST = "https://api.opsgenie.com".freeze
     ALERTS_PATH = "/v2/alerts".freeze
+    SCHEDULES_PATH = "/v2/schedules".freeze
     PAGE_LIMIT = 100
     # The API rejects offset + limit above this, which is why long ranges have
     # to be fetched a month at a time.
@@ -49,6 +50,27 @@ module OpsgenieTools
       collected
     end
 
+    # The schedules endpoint pages on paging.next rather than on page length,
+    # so it cannot share the alerts loop.
+    def schedules
+      collected = []
+      offset = 0
+
+      loop do
+        body = get_json("#{HOST}#{SCHEDULES_PATH}?limit=#{PAGE_LIMIT}&offset=#{offset}")
+        collected.concat(body["data"] || [])
+        break if body.dig("paging", "next").nil?
+
+        offset += PAGE_LIMIT
+      end
+
+      collected
+    end
+
+    def schedule(id)
+      get_json("#{HOST}#{SCHEDULES_PATH}/#{id}")["data"] || {}
+    end
+
     def add_tag(alert_id, tag)
       uri = URI("#{HOST}#{ALERTS_PATH}/#{alert_id}/tags")
       request = Net::HTTP::Post.new(uri)
@@ -69,6 +91,15 @@ module OpsgenieTools
     end
 
     private
+
+    def get_json(url)
+      uri = URI(url)
+      response = perform(Net::HTTP::Get.new(uri), uri)
+      code = response.code.to_i
+      raise Error, "HTTP #{code} fetching #{uri.request_uri}: #{response.body}" unless code == 200
+
+      parse(response.body)
+    end
 
     def fetch_page(query, offset)
       uri = URI("#{HOST}#{ALERTS_PATH}?limit=#{PAGE_LIMIT}&offset=#{offset}" \
