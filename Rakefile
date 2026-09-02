@@ -18,5 +18,20 @@ task :characterisation do
   raise "characterisation failures: #{failed.join(", ")}" unless failed.empty?
 end
 
-task test: %i[unit characterisation]
+# UPDATE_BASELINES=1 makes assert_matches_baseline rewrite every baseline to
+# match whatever the code currently prints and then skip, which Minitest does
+# not treat as a failure. A stale shell export or a leaked CI variable would
+# silently repin every baseline to a regression and report the suite green,
+# so the full suite refuses to run in that mode. Regenerate one baseline at a
+# time by running its characterisation file directly instead.
+desc "Refuse to run the whole suite in baseline-writing mode"
+task :guard_baselines do
+  if ENV["UPDATE_BASELINES"]
+    abort "UPDATE_BASELINES is set: refusing to run the full suite, which would " \
+          "rewrite every baseline to match current behaviour and report success. " \
+          "Regenerate one baseline by running its characterisation file directly."
+  end
+end
+
+task test: %i[guard_baselines unit characterisation]
 task default: :test

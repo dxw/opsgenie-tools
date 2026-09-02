@@ -1,0 +1,46 @@
+[
+  {
+    "tinyId": "5",
+    "id": "aaaaaaaa-0000-0000-0000-000000000005",
+    "message": "ALARM: \"ecs-asg-cpu-alpha-prod\" in EU (London)",
+    "acknowledged": true,
+    "report": { "acknowledgedBy": "first@example.invalid" },
+    "createdAt": "2026-08-27T21:30:00.000Z",
+    "tags": ["OOH", "wakinghours", "client_alpha"]
+  },
+  {
+    "tinyId": "4",
+    "id": "aaaaaaaa-0000-0000-0000-000000000004",
+    "message": "[Updown.io] Response timeout (30 seconds) https://status.example.com",
+    "acknowledged": true,
+    "report": { "acknowledgedBy": "first@example.invalid" },
+    "createdAt": "2026-08-27T02:05:00.000Z",
+    "tags": ["OOH", "sleepinghours", "client_alpha"]
+  },
+  {
+    "tinyId": "3",
+    "id": "aaaaaaaa-0000-0000-0000-000000000003",
+    "message": "[Updown.io] Response timeout (30 seconds) https://status.example.com/check",
+    "acknowledged": true,
+    "report": { "acknowledgedBy": "first@example.invalid" },
+    "createdAt": "2026-08-26T03:55:00.000Z",
+    "tags": ["OOH", "sleepinghours", "client_beta"]
+  },
+  {
+    "tinyId": "2",
+    "id": "aaaaaaaa-0000-0000-0000-000000000002",
+    "message": "[Updown.io] Response timeout (30 seconds) https://status.example.com",
+    "acknowledged": true,
+    "report": { "acknowledgedBy": "first@example.invalid" },
+    "createdAt": "2026-08-26T03:40:00.000Z",
+    "tags": ["OOH", "sleepinghours", "client_beta"]
+  },
+  {
+    "tinyId": "1",
+    "id": "aaaaaaaa-0000-0000-0000-000000000001",
+    "message": "ALARM: \"cloudfront-5xx-beta\" in US East (N. Virginia)",
+    "acknowledged": false,
+    "createdAt": "2026-08-25T01:10:00.000Z",
+    "tags": ["OOH", "sleepinghours", "client_beta"]
+  }
+]

@@ -1,0 +1,7 @@
+Looking for alerts without a client tag from the last 30 days...
+Alert ID: aaaaaaaa-0000-0000-0000-000000000101, Message: ALARM: "ecs-asg-cpu-alpha-prod" in EU (London)
+Automatically added tag 'client_alpha' to alert 'aaaaaaaa-0000-0000-0000-000000000101' based on client name.
+Alert ID: aaaaaaaa-0000-0000-0000-000000000102, Message: [Updown.io] Response timeout (30 seconds) https://status.example.com
+Enter client name for the tag (client_$clientname), or leave blank to skip: 
+Skipped 1 alert(s):
+  https://app.opsgenie.com/alert/detail/aaaaaaaa-0000-0000-0000-000000000102 [Updown.io] Response timeout (30 seconds) https://status.example.com

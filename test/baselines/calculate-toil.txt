@@ -1,0 +1,11 @@
+Message: [Updown.io] Response timeout (30 seconds) https://status.example.com
+Alert 2 was acknowledged by first@example.invalid. Created at: 2026-08-26 03:40:00 UTC.
+Message: [Updown.io] Response timeout (30 seconds) https://status.example.com/check
+Alert 3 was acknowledged by first@example.invalid. Created at: 2026-08-26 03:55:00 UTC.
+Message: [Updown.io] Response timeout (30 seconds) https://status.example.com
+Alert 4 was acknowledged by first@example.invalid. Created at: 2026-08-27 02:05:00 UTC.
+Message: ALARM: "ecs-asg-cpu-alpha-prod" in EU (London)
+Alert 5 was acknowledged by first@example.invalid. Created at: 2026-08-27 21:30:00 UTC.
+
+Summary of the number of alerts acknowledged by each user:
+first@example.invalid acknowledged 2 alerts during sleepinghours and 1 alerts during wakinghours. This corresponds to 1.25 TOIL.
