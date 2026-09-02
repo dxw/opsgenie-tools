@@ -40,4 +40,14 @@ class SchedulesCharacterisationTest < Minitest::Test
     assert_matches_baseline("schedules-rotations", out)
     assert_equal "", err
   end
+
+  def test_a_fetch_failure_aborts_rather_than_listing_a_partial_result
+    stub_request(:get, "https://api.opsgenie.com/v2/schedules")
+      .with(query: hash_including("limit" => "100"))
+      .to_return(status: 500, body: "boom")
+    load_script("schedules.rb")
+
+    error = assert_raises(SystemExit) { capture_io { main } }
+    assert_equal 1, error.status
+  end
 end
