@@ -10,6 +10,12 @@ require_relative 'lib/opsgenie_tools'
 Dotenv.load
 
 def main
+  rate = ENV['PAYMENT_RATE'].to_f
+  if rate.zero?
+    puts 'Error: Please set PAYMENT_RATE to the hourly on-call rate.'
+    exit 1
+  end
+
   opsgenie_date = ENV['OPSGENIE_DATE'] ? Date.parse(ENV['OPSGENIE_DATE']) : DateTime.now
   start_date, end_date = OpsgenieTools::Payment.window_for(opsgenie_date)
   if ENV['DEBUG']
@@ -37,12 +43,12 @@ def main
   end
 
   total_hours.each do |user_name, hours|
-    formatted_payment = OpsgenieTools::Payment.payment_for(hours, ENV['PAYMENT_RATE'].to_f)
+    formatted_payment = OpsgenieTools::Payment.payment_for(hours, rate)
     puts "#{user_name} was on call for #{hours} hours and should be paid £#{formatted_payment}."
   end
   if ENV['DEBUG']
   puts "Total hours: #{total_hours.values.sum}"
-  puts "Total payment: £#{OpsgenieTools::Payment.payment_for(total_hours.values.sum, ENV['PAYMENT_RATE'].to_f)}"
+  puts "Total payment: £#{OpsgenieTools::Payment.payment_for(total_hours.values.sum, rate)}"
   end
 rescue OpsgenieTools::Error => e
   warn e.message

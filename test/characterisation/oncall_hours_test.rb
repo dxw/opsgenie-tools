@@ -28,4 +28,16 @@ class OncallHoursCharacterisationTest < Minitest::Test
     assert_matches_baseline("oncall-hours", out)
     assert_equal "", err
   end
+
+  def test_an_unset_payment_rate_refuses_to_run
+    ENV.delete("PAYMENT_RATE")
+    load_script("oncall-hours.rb")
+
+    out, = capture_io do
+      error = assert_raises(SystemExit) { main }
+      assert_equal 1, error.status
+    end
+
+    assert_match(/Please set PAYMENT_RATE/, out)
+  end
 end

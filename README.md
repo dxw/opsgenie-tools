@@ -110,6 +110,17 @@ directly instead, e.g.:
 Ruby is pinned by `.ruby-version`. No test reaches the network — WebMock fails
 any un-stubbed request.
 
+### Known issues in the rota scripts
+
+* `oncall-hours.rb` keys its totals on each person's Opsgenie display name, so
+  two people with the same display name are reported and paid as one. Keying on
+  username instead would fix it, and would change the names in the report.
+* The payment window is built as local midnight plus ten hours, so a payment
+  month containing a daylight-saving transition is an hour out. Whether that is
+  wrong depends on the intent: a shift crossing the transition genuinely is an
+  hour longer in wall-clock terms. Needs a decision from whoever owns the rota
+  before it is changed.
+
 ## License
 
 MIT License
