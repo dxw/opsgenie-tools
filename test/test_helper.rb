@@ -10,6 +10,7 @@ $LOAD_PATH.unshift(File.join(ROOT, "lib"))
 
 module TestHelpers
   ALERTS_URL = "https://api.opsgenie.com/v2/alerts".freeze
+  LOADED_SCRIPTS = {}
 
   def fixture(name)
     JSON.parse(File.read(File.join(ROOT, "test", "fixtures", "#{name}.json")))
@@ -43,8 +44,15 @@ module TestHelpers
     end
   end
 
+  # Scripts define top-level constants, so loading one more than once per
+  # process re-runs those definitions and warns about already-initialized
+  # constants. All mutable state lives in main's locals, so it is safe to
+  # load each script at most once per process.
   def load_script(name)
+    return if LOADED_SCRIPTS[name]
+
     load File.join(ROOT, name)
+    LOADED_SCRIPTS[name] = true
   end
 end
 

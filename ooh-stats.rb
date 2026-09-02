@@ -11,73 +11,16 @@
 #   TOIL_WAKING_HOURS   TOIL per de-duped acknowledged wakinghours alert (default 0.0)
 #   YEARS_BACK          how many years back to look (default 3)
 require 'dotenv/load'
-require 'httparty'
-require 'json'
 require 'csv'
 require 'date'
 require 'time'
-require 'uri'
 require_relative 'lib/opsgenie_tools'
-
-BASE_URL = "https://api.opsgenie.com/v2/alerts"
-LIMIT = 100
-
-# Build [start, next] Date pairs, one per calendar month spanned by the range.
-# The first pair starts at start_date; the last pair ends at end_date.
-def month_windows(start_date, end_date)
-  windows = []
-  cursor = start_date
-  while cursor < end_date
-    first_of_next = if cursor.month == 12
-                      Date.new(cursor.year + 1, 1, 1)
-                    else
-                      Date.new(cursor.year, cursor.month + 1, 1)
-                    end
-    window_end = [first_of_next, end_date].min
-    windows << [cursor, window_end]
-    cursor = first_of_next
-  end
-  windows
-end
-
-# Count alerts per calendar day, emitting a row for every day in the range
-# (inclusive of days with zero alerts).
-def daily_counts(alerts, start_date, end_date)
-  counts = Hash.new(0)
-  alerts.each do |alert|
-    day = Time.parse(alert["createdAt"]).strftime("%Y-%m-%d")
-    counts[day] += 1
-  end
-
-  rows = []
-  day = start_date
-  while day < end_date
-    key = day.strftime("%Y-%m-%d")
-    rows << [key, counts[key]]
-    day += 1
-  end
-  rows
-end
-
-# Count alerts per calendar month, one row per month in the range.
-def monthly_totals(alerts, start_date, end_date)
-  counts = Hash.new(0)
-  alerts.each do |alert|
-    month = Time.parse(alert["createdAt"]).strftime("%Y-%m")
-    counts[month] += 1
-  end
-
-  month_windows(start_date, end_date).map do |window_start, _window_end|
-    key = window_start.strftime("%Y-%m")
-    [key, counts[key]]
-  end
-end
 
 # Estimate monthly TOIL from acknowledged OOH alerts, via OpsgenieTools::Toil.
 def monthly_toil(alerts, start_date, end_date, sleeping_rate, waking_rate)
   by_month = OpsgenieTools::Toil.by_month(alerts, sleeping: sleeping_rate, waking: waking_rate)
 
-  month_windows(start_date, end_date).map do |window_start, _window_end|
+  OpsgenieTools::Stats.month_windows(start_date, end_date).map do |window_start, _window_end|
     key = window_start.strftime("%Y-%m")
     [key, by_month.fetch(key, 0.0)]
   end
@@ -85,30 +28,12 @@ end
 
 # Fetch all OOH-tagged alerts in [start_date, end_date), one month per query
 # window to stay under OpsGenie's offset+limit <= 20000 ceiling.
-def fetch_ooh_alerts(api_key, start_date, end_date)
-  all_alerts = []
-  month_windows(start_date, end_date).each do |window_start, window_end|
-    offset = 0
-    loop do
-      formatted_start = Time.parse(window_start.to_s).strftime("%d-%m-%YT%H:%M:%S")
-      formatted_end   = Time.parse(window_end.to_s).strftime("%d-%m-%YT%H:%M:%S")
-      query = "createdAt >= '#{formatted_start}' AND createdAt < '#{formatted_end}' AND tags:(OOH)"
-      url = "#{BASE_URL}?limit=#{LIMIT}&offset=#{offset}&query=#{URI.encode_www_form_component(query)}"
-      response = HTTParty.get(url, headers: {
-        "Authorization" => "GenieKey #{api_key}",
-        "Content-Type"  => "application/json"
-      })
-      if response.code != 200
-        puts "Error fetching alerts: #{response.body}"
-        exit 1
-      end
-      alerts = JSON.parse(response.body)["data"] || []
-      break if alerts.empty?
-      all_alerts.concat(alerts)
-      offset += LIMIT
-    end
+def fetch_ooh_alerts(client, start_date, end_date)
+  OpsgenieTools::Stats.month_windows(start_date, end_date).flat_map do |window_start, window_end|
+    client.alerts(OpsgenieTools::Query.created_between(
+                    Time.parse(window_start.to_s), Time.parse(window_end.to_s), tags: %w[OOH]
+                  ))
   end
-  all_alerts
 end
 
 def main
@@ -126,17 +51,17 @@ def main
   start_date = end_date.prev_year(years_back)
 
   puts "Fetching OOH alerts from #{start_date} to #{end_date}..."
-  alerts = fetch_ooh_alerts(api_key, start_date, end_date)
+  alerts = fetch_ooh_alerts(OpsgenieTools::Client.new(api_key), start_date, end_date)
   puts "Fetched #{alerts.size} OOH alerts."
 
   CSV.open("ooh_daily_counts.csv", "w") do |csv|
     csv << ["date", "count"]
-    daily_counts(alerts, start_date, end_date).each { |row| csv << row }
+    OpsgenieTools::Stats.daily_counts(alerts, start_date, end_date).each { |row| csv << row }
   end
 
   CSV.open("ooh_monthly_totals.csv", "w") do |csv|
     csv << ["month", "count"]
-    monthly_totals(alerts, start_date, end_date).each { |row| csv << row }
+    OpsgenieTools::Stats.monthly_totals(alerts, start_date, end_date).each { |row| csv << row }
   end
 
   CSV.open("ooh_monthly_toil.csv", "w") do |csv|
@@ -145,6 +70,9 @@ def main
   end
 
   puts "Wrote ooh_daily_counts.csv, ooh_monthly_totals.csv, ooh_monthly_toil.csv"
+rescue OpsgenieTools::Error => e
+  warn e.message
+  exit 1
 end
 
 main if __FILE__ == $0

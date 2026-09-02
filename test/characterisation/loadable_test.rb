@@ -4,13 +4,13 @@ require "test_helper"
 # request. WebMock.disable_net_connect! turns any request into a failure.
 #
 # Each script loads in its own forked child process. That keeps two things
-# separate that a single shared process would conflate: ooh-stats.rb and
-# stats.rb both define top-level BASE_URL and LIMIT, so loading both in one
-# process makes Ruby warn about the redefinition regardless of what either
-# script does on its own; and a script that prints or raises during load
-# must not be able to hide behind a later script's clean run. fork inherits
-# the parent's already-loaded WebMock, so disable_net_connect! still applies
-# in the child and a script that reaches the network still fails there.
+# separate that a single shared process would conflate: a script loaded
+# alongside another script is not being characterised alone, so its clean
+# load could depend on state an earlier script's load happened to leave
+# behind; and a script that prints or raises during load must not be able
+# to hide behind a later script's clean run. fork inherits the parent's
+# already-loaded WebMock, so disable_net_connect! still applies in the
+# child and a script that reaches the network still fails there.
 class LoadableTest < Minitest::Test
   SCRIPTS = %w[
     calculate-toil.rb

@@ -18,7 +18,7 @@ These can all be set in a `.env` file in the same directory as the script as wel
 
 A script to output who is on call for the next 4 weeks.
 
-### calcualte-toil.rb
+### calculate-toil.rb
 
 A script to calculate the TOIL owed to people due to OOH alerts they have
 acknowledged. This gives a rough estimate of the TOIL owed so that the Line
@@ -88,6 +88,27 @@ Usage: `bundle exec ruby ooh-stats.rb`
 * `YEARS_BACK`: How many years back to look (default `3`).
 
 These can be set in a `.env` file in the same directory as the script.
+
+## Development
+
+The scripts are thin wrappers around `lib/opsgenie_tools/`, which owns fetching from
+the Opsgenie API and the TOIL, tagging and statistics calculations.
+
+Run the tests with:
+
+    bundle exec rake test
+
+Unit tests under `test/unit/` cover the library. Characterisation tests under
+`test/characterisation/` load each script and assert its output still matches
+the pinned baselines in `test/baselines/`. `bundle exec rake test` refuses to
+run under `UPDATE_BASELINES=1`, so when a change to output is intended,
+regenerate one baseline at a time by running its characterisation file
+directly instead, e.g.:
+
+    UPDATE_BASELINES=1 bundle exec ruby -Ilib -Itest test/characterisation/stats_test.rb
+
+Ruby is pinned by `.ruby-version`. No test reaches the network — WebMock fails
+any un-stubbed request.
 
 ## License
 

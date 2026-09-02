@@ -17,21 +17,13 @@
 #   OPSGENIE_API_KEY=your-api-key
 #   BUSINESS_UNIT_TAGS=unit1,unit2
 #   TIME_TAGS=OOH,inhours,wakinghours,sleepinghours
-#   
+#
 #   These can be set in a .env file in the same directory as the script.
 require 'dotenv/load'
 require 'optparse'
-require 'httparty'
-require 'json'
 require 'date'
 require 'time'
-require 'uri'
-
-# Opsgenie API key, checked in main so loading the script does not exit.
-OPSGENIE_API_KEY = ENV['OPSGENIE_API_KEY']
-
-BASE_URL = "https://api.opsgenie.com/v2/alerts"
-LIMIT = 100
+require_relative 'lib/opsgenie_tools'
 
 # Parse command-line options.
 def parse_options
@@ -81,81 +73,6 @@ def determine_date_range(options)
   end
 end
 
-# Fetch alerts from Opsgenie in the given time range using pagination.
-def fetch_alerts(start_time, end_time)
-  all_alerts = []
-  offset = 0
-  loop do
-    # Format times as "dd-MM-yyyy'T'HH:mm:ss" per Opsgenie requirements.
-    formatted_start = start_time.strftime("%d-%m-%YT%H:%M:%S")
-    formatted_end   = end_time.strftime("%d-%m-%YT%H:%M:%S")
-    query = "createdAt >= '#{formatted_start}' AND createdAt < '#{formatted_end}'"
-    url = "#{BASE_URL}?limit=#{LIMIT}&offset=#{offset}&query=#{URI.encode_www_form_component(query)}"
-    response = HTTParty.get(url, headers: {
-      "Authorization" => "GenieKey #{OPSGENIE_API_KEY}",
-      "Content-Type"  => "application/json"
-    })
-    if response.code != 200
-      puts "Error fetching alerts: #{response.body}"
-      exit 1
-    end
-    data = JSON.parse(response.body)
-    alerts = data["data"] || []
-    break if alerts.empty?
-    all_alerts.concat(alerts)
-    offset += LIMIT
-  end
-  all_alerts
-end
-
-# Process alerts to create a summary report.
-#
-# For each alert that has a business unit tag (from env var BUSINESS_UNIT_TAGS),
-# we count any matching time tags (from env var TIME_TAGS). Additionally, if the alert
-# has client tags (starting with "client_"), we count them for that business unit.
-#
-# The summary includes overall company totals, per–business unit totals,
-# and client breakdowns per business unit.
-def process_alerts(alerts)
-  # Get configurable tags from env variables.
-  business_units = (ENV['BUSINESS_UNIT_TAGS'] || "deliveryplus,govpress").split(',').map(&:strip)
-  time_tags = (ENV['TIME_TAGS'] || "OOH,inhours,wakinghours,sleepinghours").split(',').map(&:strip)
-
-  # Initialize the summary.
-  summary = { "company" => { totals: Hash.new(0) } }
-  business_units.each do |bu|
-    summary[bu] = { totals: Hash.new(0), clients: {} }
-  end
-
-  alerts.each do |alert|
-    tags = alert["tags"] || []
-    # Identify the business unit for this alert (first match).
-    bu = business_units.find { |b| tags.include?(b) }
-    next if bu.nil?
-
-    present_time_tags = tags & time_tags
-    next if present_time_tags.empty?
-
-    # Update totals for both the business unit and company.
-    present_time_tags.each do |ttag|
-      summary[bu][:totals][ttag] += 1
-      summary["company"][:totals][ttag] += 1
-    end
-
-    # Update client-specific counts.
-    client_tags = tags.select { |t| t.start_with?("client_") }
-    client_tags.each do |ctag|
-      client_name = ctag.sub(/^client_/, '')
-      summary[bu][:clients][client_name] ||= Hash.new(0)
-      present_time_tags.each do |ttag|
-        summary[bu][:clients][client_name][ttag] += 1
-      end
-    end
-  end
-
-  return summary, business_units, time_tags
-end
-
 # Output the summary report.
 def output_summary(summary, time_tags, business_units)
   puts "\n=== Company Totals ==="
@@ -187,10 +104,14 @@ def output_summary(summary, time_tags, business_units)
 end
 
 def main
-  unless OPSGENIE_API_KEY
+  api_key = ENV['OPSGENIE_API_KEY']
+  unless api_key
     puts "Error: Please set the OPSGENIE_API_KEY environment variable."
     exit 1
   end
+
+  business_units = (ENV['BUSINESS_UNIT_TAGS'] || "deliveryplus,govpress").split(',').map(&:strip)
+  time_tags = (ENV['TIME_TAGS'] || "OOH,inhours,wakinghours,sleepinghours").split(',').map(&:strip)
 
   options = parse_options
   start_date, end_date = determine_date_range(options)
@@ -199,16 +120,20 @@ def main
   end_time   = Time.parse(end_date.to_s)
 
   # Format times for display.
-  formatted_start = start_time.strftime("%d-%m-%YT%H:%M:%S")
-  formatted_end   = end_time.strftime("%d-%m-%YT%H:%M:%S")
+  formatted_start = OpsgenieTools::Query.timestamp(start_time)
+  formatted_end   = OpsgenieTools::Query.timestamp(end_time)
   puts "Fetching alerts from #{formatted_start} to #{formatted_end}..."
 
-  alerts = fetch_alerts(start_time, end_time)
-  summary, business_units, time_tags = process_alerts(alerts)
+  query = OpsgenieTools::Query.created_between(start_time, end_time)
+  alerts = OpsgenieTools::Client.new(api_key).alerts(query)
+  summary = OpsgenieTools::Stats.summarise(alerts, business_units: business_units, time_tags: time_tags)
 
   total_alerts = alerts.size
   puts "\nTotal alerts processed: #{total_alerts}"
   output_summary(summary, time_tags, business_units)
+rescue OpsgenieTools::Error => e
+  warn e.message
+  exit 1
 end
 
 main if __FILE__ == $0

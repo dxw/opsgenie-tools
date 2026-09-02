@@ -6,11 +6,11 @@ Rake::TestTask.new(:unit) do |t|
   t.warning = false
 end
 
-# Characterisation tests load whole scripts. Two pairs of scripts define
-# colliding top-level constants (BASE_URL and LIMIT in the statistics scripts,
-# API_KEY elsewhere), so each file gets its own Ruby process.
+# Characterisation tests load whole scripts. A characterisation test sharing
+# a process with another script's characterisation test is not characterising
+# that script alone, so each file gets its own Ruby process.
 desc "Run characterisation tests, one process per file"
-task :characterisation do
+task characterisation: :guard_baselines do
   files = FileList["test/characterisation/**/*_test.rb"]
   failed = files.reject do |file|
     sh("bundle", "exec", "ruby", "-Ilib", "-Itest", file) { |ok, _status| ok }

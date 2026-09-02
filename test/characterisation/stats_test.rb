@@ -1,4 +1,7 @@
 require "test_helper"
+require "date"
+require "time"
+require "opsgenie_tools"
 
 class StatsCharacterisationTest < Minitest::Test
   def setup
@@ -17,8 +20,14 @@ class StatsCharacterisationTest < Minitest::Test
     ARGV.replace(@argv)
   end
 
+  # --start/--end above become [2026-08-25, 2026-08-26) once the end date is
+  # made exclusive.
+  def expected_query
+    OpsgenieTools::Query.created_between(Time.parse("2026-08-25"), Time.parse("2026-08-26"))
+  end
+
   def test_output_is_unchanged
-    stub_alerts_pages(fixture("alerts_stats"), [])
+    stub_alerts_pages(fixture("alerts_stats"), [], query: expected_query)
     load_script("stats.rb")
 
     out, err = capture_io { main }
