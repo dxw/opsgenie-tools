@@ -32,7 +32,10 @@ class NextOncallCharacterisationTest < Minitest::Test
 
   def test_output_is_unchanged
     stub_schedule("sched-1")
-    stub_timeline("sched-1", body: far_future_timeline)
+    today = Date.today.to_datetime.to_s
+    stub_timeline("sched-1", body: far_future_timeline,
+                              query: { "date" => today, "interval" => "6",
+                                       "intervalUnit" => "months" })
     stub_users
     load_script("next-oncall.rb")
 

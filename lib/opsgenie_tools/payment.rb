@@ -6,6 +6,10 @@ module OpsgenieTools
   # runs first Wednesday to first Wednesday rather than calendar month.
   module Payment
     HANDOVER_HOUR = 10
+    # The rota hands over on a Wednesday. OnCall names the same day for the
+    # rota week; Payment keeps its own so that requiring this file alone
+    # cannot raise NameError on a sibling module.
+    WEDNESDAY = 3
 
     class << self
       def window_for(date)
@@ -41,7 +45,7 @@ module OpsgenieTools
 
       def first_wednesday(year, month)
         day = Date.new(year, month, 1)
-        day += 1 until day.wday == 3
+        day += 1 until day.wday == WEDNESDAY
         day.to_time + HANDOVER_HOUR * 60 * 60
       end
     end

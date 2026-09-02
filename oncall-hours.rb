@@ -22,7 +22,11 @@ def main
   puts "Calculating on call hours from #{start_date} to #{end_date}"
   end
 
-  rotation_ids = ENV['OPSGENIE_ROTATION_ID'].to_s.split(',')
+  rotation_ids = ENV['OPSGENIE_ROTATION_ID'].to_s.split(',').map(&:strip).reject(&:empty?)
+  if rotation_ids.empty?
+    puts 'Error: Please set OPSGENIE_ROTATION_ID to the rotation ids to report on.'
+    exit 1
+  end
   rota = OpsgenieTools::Rota.new(ENV['OPSGENIE_API_KEY'])
   timeline = rota.timeline(ENV['OPSGENIE_SCHEDULE_ID'], from: start_date.to_date, months: 2)
 

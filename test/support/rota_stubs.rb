@@ -1,6 +1,9 @@
 # Stubs for the endpoints the opsgenie-schedule gem calls on the scripts'
 # behalf. The gem builds its URLs with CGI.escape on a datetime, so these
-# match on path and ignore the query unless a test needs otherwise.
+# match on path and leave the query unconstrained unless a `query:` hash is
+# given, the way stub_alerts_page does for the alerts endpoint. WebMock
+# decodes the query when matching, so pin the "date" value as the plain
+# datetime string (e.g. "2026-09-02T00:00:00+00:00"), not the escaped form.
 module RotaStubs
   GEM_ROOT = "https://api.opsgenie.com/v2".freeze
 
@@ -20,10 +23,11 @@ module RotaStubs
                  headers: { "Content-Type" => "application/json" })
   end
 
-  def stub_timeline(id, body: fixture("rota_timeline"))
-    stub_request(:get, %r{#{Regexp.escape("#{GEM_ROOT}/schedules/#{id}/timeline")}})
-      .to_return(status: 200, body: JSON.dump(body),
-                 headers: { "Content-Type" => "application/json" })
+  def stub_timeline(id, body: fixture("rota_timeline"), query: nil)
+    stub = stub_request(:get, %r{#{Regexp.escape("#{GEM_ROOT}/schedules/#{id}/timeline")}})
+    stub = stub.with(query: hash_including(query)) if query
+    stub.to_return(status: 200, body: JSON.dump(body),
+                   headers: { "Content-Type" => "application/json" })
   end
 
   def stub_users(body: fixture("rota_users"))
@@ -32,10 +36,11 @@ module RotaStubs
                  headers: { "Content-Type" => "application/json" })
   end
 
-  def stub_on_calls(id, body: fixture("rota_on_calls"))
-    stub_request(:get, %r{#{Regexp.escape("#{GEM_ROOT}/schedules/#{id}/on-calls")}})
-      .to_return(status: 200, body: JSON.dump(body),
-                 headers: { "Content-Type" => "application/json" })
+  def stub_on_calls(id, body: fixture("rota_on_calls"), query: nil)
+    stub = stub_request(:get, %r{#{Regexp.escape("#{GEM_ROOT}/schedules/#{id}/on-calls")}})
+    stub = stub.with(query: hash_including(query)) if query
+    stub.to_return(status: 200, body: JSON.dump(body),
+                   headers: { "Content-Type" => "application/json" })
   end
 
   # schedules.rb's own endpoint, which pages on paging.next

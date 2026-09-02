@@ -2,8 +2,7 @@ require "opsgenie"
 
 module OpsgenieTools
   # Intended to be the only place in this repository that names
-  # Opsgenie:: constants — the three rota scripts still do until later tasks
-  # migrate them onto this adapter.
+  # Opsgenie:: constants.
   #
   # The gem returns nil for a schedule it cannot find and digs blindly into a
   # timeline response, so an expired key or a deleted schedule arrives at the
@@ -35,10 +34,14 @@ module OpsgenieTools
       raise Error, "no usable timeline for schedule #{id}"
     end
 
+    # The gem maps each participant through User.find_by_username, which
+    # returns nil for a name its unpaged users?limit=500 fetch missed —
+    # any organisation above 500 users, or a deactivated participant. Drop
+    # those here so callers only ever see resolved users.
     def on_call(id, at:)
       raise ArgumentError, "at must not be nil" if at.nil?
 
-      schedule(id).on_calls(at)
+      schedule(id).on_calls(at).compact
     rescue NoMethodError
       raise Error, "no usable on-call list for schedule #{id}"
     end

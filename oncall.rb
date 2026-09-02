@@ -5,15 +5,27 @@ require 'json'
 require 'dotenv/load'
 require_relative 'lib/opsgenie_tools'
 
+# The hour at which "who is on call this week" is sampled.
+SAMPLE_HOUR = 19
+
 def main
   weeks = (ENV['OPSGENIE_WEEKS'] || 4).to_i
   rota = OpsgenieTools::Rota.new(ENV['OPSGENIE_API_KEY'])
-  email_to_slack_map = JSON.parse(ENV['EMAIL_TO_SLACK_MAP'].to_s)
+  if ENV['EMAIL_TO_SLACK_MAP'].to_s.empty?
+    raise OpsgenieTools::Error, 'Please set EMAIL_TO_SLACK_MAP to a JSON map of email to Slack name.'
+  end
+
+  email_to_slack_map =
+    begin
+      JSON.parse(ENV['EMAIL_TO_SLACK_MAP'])
+    rescue JSON::ParserError => e
+      raise OpsgenieTools::Error, "EMAIL_TO_SLACK_MAP is not valid JSON: #{e.message}"
+    end
 
   puts "Week starting: 1st line / 2nd line"
   weeks.times do |i|
     wednesday = OpsgenieTools::OnCall.next_wednesday + i * 7
-    date_time = DateTime.parse("#{wednesday.strftime('%Y-%m-%d')}T19:00:00")
+    date_time = DateTime.parse("#{wednesday.strftime('%Y-%m-%d')}T#{format('%02d:00:00', SAMPLE_HOUR)}")
 
     first_line = names_for(rota, ENV['OPSGENIE_SCHEDULE_ID'], date_time, email_to_slack_map)
     second_line = names_for(rota, ENV['OPSGENIE_SCHEDULE_ID_SECONDLINE'], date_time, email_to_slack_map)

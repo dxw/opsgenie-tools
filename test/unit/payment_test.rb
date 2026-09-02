@@ -28,6 +28,18 @@ class PaymentTest < Minitest::Test
     assert_equal "2027-01-06 10:00", to.strftime("%Y-%m-%d %H:%M")
   end
 
+  # Requiring this file alone must not raise: reaching into a sibling module
+  # for a weekday made window_for fail with NameError.
+  def test_the_module_works_without_its_siblings_loaded
+    output = IO.popen(["ruby", "-I#{File.join(ROOT, "lib")}", "-rdate", "-e",
+                       'require "opsgenie_tools/payment"; ' \
+                       'print OpsgenieTools::Payment.window_for(Date.new(2026, 9, 10)).first.strftime("%Y-%m-%d")'],
+                      err: %i[child out], &:read)
+
+    assert_predicate $?, :success?, "requiring payment.rb alone failed:\n#{output}"
+    assert_equal "2026-09-02", output
+  end
+
   def test_hours_between
     assert_equal 168.0, P.hours_between(Time.utc(2026, 9, 2, 10), Time.utc(2026, 9, 9, 10))
   end

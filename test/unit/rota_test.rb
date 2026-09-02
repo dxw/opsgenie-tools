@@ -39,7 +39,8 @@ class RotaTest < Minitest::Test
 
   def test_returns_timeline_rotations
     stub_schedule("sched-1")
-    stub_timeline("sched-1")
+    stub_timeline("sched-1", query: { "date" => "2026-09-02T00:00:00+00:00",
+                                       "interval" => "2", "intervalUnit" => "months" })
     stub_users
 
     rotations = @rota.timeline("sched-1", from: Date.new(2026, 9, 2), months: 2)
@@ -50,7 +51,9 @@ class RotaTest < Minitest::Test
 
   def test_a_timeline_with_no_final_timeline_raises
     stub_schedule("sched-1")
-    stub_timeline("sched-1", body: { "message" => "unauthorised" })
+    stub_timeline("sched-1", body: { "message" => "unauthorised" },
+                              query: { "date" => "2026-09-02T00:00:00+00:00",
+                                       "interval" => "2", "intervalUnit" => "months" })
 
     error = assert_raises(OpsgenieTools::Error) do
       @rota.timeline("sched-1", from: Date.new(2026, 9, 2), months: 2)
@@ -66,7 +69,24 @@ class RotaTest < Minitest::Test
 
   def test_returns_on_call_users
     stub_schedule("sched-1")
-    stub_on_calls("sched-1")
+    stub_on_calls("sched-1", query: { "date" => "2026-09-02T19:00:00+00:00" })
+    stub_users
+
+    users = @rota.on_call("sched-1", at: DateTime.new(2026, 9, 2, 19, 0, 0))
+
+    assert_equal ["first@example.invalid"], users.map(&:username)
+  end
+
+  # The gem's User.find_by_username returns nil for a participant its
+  # unpaged users?limit=500 fetch missed. Rota#on_call must drop that
+  # nil rather than hand a caller a list it will crash iterating.
+  def test_an_unresolved_participant_is_dropped
+    stub_schedule("sched-1")
+    stub_on_calls("sched-1", query: { "date" => "2026-09-02T19:00:00+00:00" },
+                              body: { "data" => { "onCallParticipants" => [
+                                { "type" => "user", "name" => "first@example.invalid" },
+                                { "type" => "user", "name" => "missing@example.invalid" }
+                              ] } })
     stub_users
 
     users = @rota.on_call("sched-1", at: DateTime.new(2026, 9, 2, 19, 0, 0))
@@ -76,7 +96,8 @@ class RotaTest < Minitest::Test
 
   def test_an_on_call_with_no_participants_raises
     stub_schedule("sched-1")
-    stub_on_calls("sched-1", body: { "message" => "unauthorised" })
+    stub_on_calls("sched-1", body: { "message" => "unauthorised" },
+                              query: { "date" => "2026-09-02T19:00:00+00:00" })
 
     error = assert_raises(OpsgenieTools::Error) do
       @rota.on_call("sched-1", at: DateTime.new(2026, 9, 2, 19, 0, 0))
