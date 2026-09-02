@@ -19,11 +19,16 @@ module TestHelpers
     File.join(ROOT, "test", "baselines", "#{name}.txt")
   end
 
-  # The scripts build queries from Time.now, so match on the offset and leave
-  # the date out of the expectation.
-  def stub_alerts_page(alerts:, offset: 0, status: 200, body: nil)
+  # Pass `query` to pin the query= param a script should be sending, built
+  # with the same OpsgenieTools::Query call the script makes (or a Regexp
+  # matching the query shape, for a script that issues one query per date
+  # window). Leaving it nil leaves the query unconstrained.
+  def stub_alerts_page(alerts:, offset: 0, status: 200, body: nil, query: nil)
+    expected = { "limit" => "100", "offset" => offset.to_s }
+    expected["query"] = query if query
+
     stub_request(:get, ALERTS_URL)
-      .with(query: hash_including("limit" => "100", "offset" => offset.to_s))
+      .with(query: hash_including(expected))
       .to_return(
         status: status,
         body: body || JSON.dump("data" => alerts),
@@ -32,9 +37,9 @@ module TestHelpers
   end
 
   # stub_alerts_pages(page_one, page_two) stubs offsets 0 and 100 in order.
-  def stub_alerts_pages(*pages)
+  def stub_alerts_pages(*pages, query: nil)
     pages.each_with_index do |alerts, index|
-      stub_alerts_page(alerts: alerts, offset: index * 100)
+      stub_alerts_page(alerts: alerts, offset: index * 100, query: query)
     end
   end
 

@@ -1,0 +1,2 @@
+
+Summary of the number of alerts acknowledged by each user:
