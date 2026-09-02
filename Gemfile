@@ -2,8 +2,12 @@
 
 source "https://rubygems.org"
 
-# gem "rails"
-
 gem "opsgenie-schedule", "~> 0.1.4"
 
 gem "dotenv", "~> 3.0"
+
+group :test do
+  gem "minitest", "~> 5.25"
+  gem "rake", "~> 13.2"
+  gem "webmock", "~> 3.24"
+end
