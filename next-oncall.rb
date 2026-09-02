@@ -19,41 +19,45 @@ Dotenv.load
 # Configure Opsgenie
 Opsgenie.configure(api_key: ENV['OPSGENIE_API_KEY'])
 
-options = {}
-OptionParser.new do |opts|
-  opts.banner = "Usage: next-oncall.rb [options]"
+def main
+  options = {}
+  OptionParser.new do |opts|
+    opts.banner = "Usage: next-oncall.rb [options]"
 
-  opts.on("-e", "--email EMAIL", "Email") do |email|
-    options[:email] = email
-  end
-end.parse!
+    opts.on("-e", "--email EMAIL", "Email") do |email|
+      options[:email] = email
+    end
+  end.parse!
 
-raise OptionParser::MissingArgument, 'Email not provided' if options[:email].nil?
+  raise OptionParser::MissingArgument, 'Email not provided' if options[:email].nil?
 
-# Fetch a schedule by its id
-schedule = Opsgenie::Schedule.find_by_id(ENV['OPSGENIE_SCHEDULE_ID'])
+  # Fetch a schedule by its id
+  schedule = Opsgenie::Schedule.find_by_id(ENV['OPSGENIE_SCHEDULE_ID'])
 
-# Fetch the schedule timeline for the next 'interval' months or default to 6
-interval = ENV.fetch('LOOK_AHEAD_MONTHS', 6).to_i
-timeline = schedule.timeline(interval: interval, interval_unit: :months)
+  # Fetch the schedule timeline for the next 'interval' months or default to 6
+  interval = ENV.fetch('LOOK_AHEAD_MONTHS', 6).to_i
+  timeline = schedule.timeline(interval: interval, interval_unit: :months)
 
-next_on_call_period = nil
+  next_on_call_period = nil
 
-# Find rotation by id
-rotation = timeline.find { |rotation| rotation.id == ENV['OPSGENIE_ROTATION_ID'] }
+  # Find rotation by id
+  rotation = timeline.find { |rotation| rotation.id == ENV['OPSGENIE_ROTATION_ID'] }
 
-if rotation
-  rotation.periods.each do |period|
-    if period.user && period.user.username == options[:email] && period.start_date > DateTime.now
-      next_on_call_period = period if next_on_call_period.nil? || period.start_date < next_on_call_period.start_date
+  if rotation
+    rotation.periods.each do |period|
+      if period.user && period.user.username == options[:email] && period.start_date > DateTime.now
+        next_on_call_period = period if next_on_call_period.nil? || period.start_date < next_on_call_period.start_date
+      end
     end
   end
+
+  if next_on_call_period
+    # Format DateTime to be more human-readable
+    formatted_date = next_on_call_period.start_date.strftime("%B %d, %Y")
+    puts "#{options[:email]} is next on call on #{formatted_date}"
+  else
+    puts "#{options[:email]} is not on call in the next #{interval} months for the specified rotation."
+  end
 end
 
-if next_on_call_period
-  # Format DateTime to be more human-readable
-  formatted_date = next_on_call_period.start_date.strftime("%B %d, %Y")
-  puts "#{options[:email]} is next on call on #{formatted_date}"
-else
-  puts "#{options[:email]} is not on call in the next #{interval} months for the specified rotation."
-end
+main if __FILE__ == $0

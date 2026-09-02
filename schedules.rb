@@ -11,15 +11,6 @@ Dotenv.load
 
 API_KEY = ENV['OPSGENIE_API_KEY']
 
-options = {}
-OptionParser.new do |opts|
-  opts.banner = "Usage: schedules.rb [options] by default it will print all the schedules in OpsGenie"
-
-  opts.on("-n", "--name SCHEDULE_NAME", "schedule name to find rotations for ") do |name|
-    options[:schedule_name] = name
-  end
-end.parse!
-
 def get_schedules(api_key)
   schedules = []
   limit = 100
@@ -79,17 +70,30 @@ def print_rotations(rotations)
   end
 end
 
-schedules = get_schedules(API_KEY)
+def main
+  options = {}
+  OptionParser.new do |opts|
+    opts.banner = "Usage: schedules.rb [options] by default it will print all the schedules in OpsGenie"
 
-if options[:schedule_name]
-  schedule = schedules.find { |r| r['name'] == options[:schedule_name] }
-  if schedule
-    puts "Schedule ID for '#{options[:schedule_name]}' is '#{schedule['id']}'"
-    rotation_details = get_rotation_details(API_KEY, schedule['id'])
-    print_rotations(rotation_details['data']['rotations']) if rotation_details
+    opts.on("-n", "--name SCHEDULE_NAME", "schedule name to find rotations for ") do |name|
+      options[:schedule_name] = name
+    end
+  end.parse!
+
+  schedules = get_schedules(API_KEY)
+
+  if options[:schedule_name]
+    schedule = schedules.find { |r| r['name'] == options[:schedule_name] }
+    if schedule
+      puts "Schedule ID for '#{options[:schedule_name]}' is '#{schedule['id']}'"
+      rotation_details = get_rotation_details(API_KEY, schedule['id'])
+      print_rotations(rotation_details['data']['rotations']) if rotation_details
+    else
+      puts "Rota '#{options[:schedule_name]}' not found"
+    end
   else
-    puts "Rota '#{options[:schedule_name]}' not found"
+    print_all_schedules(schedules)
   end
-else
-  print_all_schedules(schedules)
 end
+
+main if __FILE__ == $0
