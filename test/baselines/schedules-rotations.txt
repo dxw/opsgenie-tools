@@ -1,0 +1,4 @@
+Schedule ID for 'OOH' is 'sched-1'
+Rotations:
+  Primary (ID: rot-1)
+  Secondary (ID: rot-2)

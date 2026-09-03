@@ -12,11 +12,23 @@ period we use for paying for our rota.
 usage: `PAYMENT_RATE=10.00 OPSGENIE_API_KEY=yourkeyhere OPSGENIE_SCHEDULE_ID=youridhere OPSGENIE_ROTATION_ID=youridhere,youroptionalsecondidhere bundle exec oncall-hours.rb`
 
 You can also set OPSGENIE_DATE to a date in the month you want to calculate for, otherwise it will use the current date.
-These can all be set in a `.env` file in the same directory as the script as well
+These can all be set in a `.env` file in the same directory as the script as well.
+
+`PAYMENT_RATE` is mandatory — the script refuses to run without it.
 
 ### oncall.rb
 
 A script to output who is on call for the next 4 weeks.
+
+**Environment Variables:**
+* `OPSGENIE_API_KEY`: Your OpsGenie API key.
+* `OPSGENIE_SCHEDULE_ID`: The first-line schedule to report on.
+* `OPSGENIE_SCHEDULE_ID_SECONDLINE`: The second-line schedule to report on.
+* `EMAIL_TO_SLACK_MAP`: A JSON string mapping each on-call person's email to their Slack name (e.g. `'{"alice@example.com":"alice"}'`). Required — the script refuses to run without it.
+* `OPSGENIE_WEEKS`: How many weeks ahead to report (default `4`).
+
+A week with nobody on either schedule reads as `Nobody` rather than repeating
+the previous week's name.
 
 ### calculate-toil.rb
 
@@ -92,7 +104,8 @@ These can be set in a `.env` file in the same directory as the script.
 ## Development
 
 The scripts are thin wrappers around `lib/opsgenie_tools/`, which owns fetching from
-the Opsgenie API and the TOIL, tagging and statistics calculations.
+the Opsgenie API, the TOIL, tagging and statistics calculations, and the payment
+month and rota week used by the on-call scripts.
 
 Run the tests with:
 
@@ -109,6 +122,30 @@ directly instead, e.g.:
 
 Ruby is pinned by `.ruby-version`. No test reaches the network — WebMock fails
 any un-stubbed request.
+
+### Known issues in the rota scripts
+
+* `oncall-hours.rb` keys its totals on each person's Opsgenie display name, so
+  two people with the same display name are reported and paid as one. Keying on
+  username instead would fix it, and would change the names in the report.
+* The payment window is built as local midnight plus ten hours, so a payment
+  month containing a daylight-saving transition is an hour out. Whether that is
+  wrong depends on the intent: a shift crossing the transition genuinely is an
+  hour longer in wall-clock terms. Needs a decision from whoever owns the rota
+  before it is changed.
+* A period that ends exactly at the window start yields zero hours but still
+  creates a key in the totals, so the report prints a phantom
+  `X was on call for 0.0 hours and should be paid £0.00.` line — this happens
+  for the ordinary previous-week handover, not just as an edge case. It is
+  behaviour-identical to the original script, so fixing it would change pinned
+  output and needs the same kind of decision as the other two.
+
+### Other known behaviour changes
+
+* `schedules.rb`'s single-schedule fetch (`-n`) used to print
+  `Error: <code> - <message>` to stdout and exit 0 on a failed lookup. It now
+  raises and the script warns to stderr and exits 1, consistent with every
+  other fetch failure in the repository.
 
 ## License
 

@@ -18,6 +18,10 @@ class LoadableTest < Minitest::Test
     stats.rb
     tag_business_unit.rb
     client_tags.rb
+    oncall-hours.rb
+    oncall.rb
+    next-oncall.rb
+    schedules.rb
   ].freeze
 
   def test_scripts_load_without_running
